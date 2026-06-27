@@ -459,7 +459,7 @@ export function ProformaForm({ initial, prefill, mode }: ProformaFormProps) {
   );
 
   return (
-    <div className="space-y-4 pb-24">
+    <div className="max-w-5xl mx-auto w-full space-y-4 pb-24 px-1">
       {/* ── Section: Company Details ─────────────────────── */}
       <Section
         icon={<Building2 className="h-4 w-4" />}
@@ -974,38 +974,40 @@ export function ProformaForm({ initial, prefill, mode }: ProformaFormProps) {
       </Section>
 
       {/* ── Sticky Action Bar ─────────────────────────────── */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-800 bg-slate-950/95 backdrop-blur-sm px-6 py-3 flex items-center justify-between gap-4">
-        <div className="text-sm text-slate-400">
-          Grand Total:{" "}
-          <span className="text-xl font-bold text-primary">{formatINR(grandTotal)}</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            disabled={saving}
-            className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 transition-colors disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSave("draft")}
-            disabled={saving}
-            className="flex items-center gap-2 rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800 transition-colors disabled:opacity-50"
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Save Draft
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSave("sent")}
-            disabled={saving}
-            className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            Save & Mark Sent
-          </button>
+      <div className="fixed bottom-0 left-0 lg:left-[240px] right-0 z-40 border-t border-slate-800 bg-slate-950/95 backdrop-blur-sm px-6 py-3">
+        <div className="max-w-5xl mx-auto w-full flex items-center justify-between gap-4">
+          <div className="text-sm text-slate-400">
+            Grand Total:{" "}
+            <span className="text-xl font-bold text-primary">{formatINR(grandTotal)}</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              disabled={saving}
+              className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSave("draft")}
+              disabled={saving}
+              className="flex items-center gap-2 rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800 transition-colors disabled:opacity-50"
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Save Draft
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSave("sent")}
+              disabled={saving}
+              className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              Save & Mark Sent
+            </button>
+          </div>
         </div>
       </div>
     </div>

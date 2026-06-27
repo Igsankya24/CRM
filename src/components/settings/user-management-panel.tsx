@@ -1157,7 +1157,7 @@ export function UserManagementPanel({ defaultTab = "users" }: { defaultTab?: str
 
       {/* Role Permissions Matrix Modal */}
       <Dialog open={rolePermsOpen} onOpenChange={setRolePermsOpen}>
-        <DialogContent className="border-slate-800 bg-slate-950 text-white max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="border-slate-800 bg-slate-950 text-white max-w-5xl max-h-[90vh] overflow-hidden flex flex-col w-full">
           <DialogHeader className="px-1">
             <DialogTitle>Manage Role Permissions: {selectedRole?.name}</DialogTitle>
             <DialogDescription className="text-slate-400">
@@ -1172,9 +1172,9 @@ export function UserManagementPanel({ defaultTab = "users" }: { defaultTab?: str
               <Table>
                 <TableHeader>
                   <TableRow className="border-slate-800/60 hover:bg-transparent">
-                    <TableHead className="text-slate-400 w-[200px]">Module</TableHead>
-                    <TableHead className="text-slate-400 w-[60px] text-center text-xs">Grant</TableHead>
-                    <TableHead className="text-slate-400 text-xs">Permission</TableHead>
+                    <TableHead className="text-slate-400 w-[250px] min-w-[250px]">Module</TableHead>
+                    <TableHead className="text-slate-400 w-[100px] min-w-[100px] text-center text-xs">Grant</TableHead>
+                    <TableHead className="text-slate-400 w-[180px] min-w-[180px] text-xs">Permission</TableHead>
                     <TableHead className="text-slate-400 text-xs">Description</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1183,10 +1183,10 @@ export function UserManagementPanel({ defaultTab = "users" }: { defaultTab?: str
                     .sort((a, b) => a.module.localeCompare(b.module) || a.action.localeCompare(b.action))
                     .map((perm) => (
                       <TableRow key={perm.id} className="border-slate-800/40 hover:bg-slate-900/10">
-                        <TableCell className="font-medium text-slate-300 text-xs">
+                        <TableCell className="font-medium text-slate-300 text-xs w-[250px] min-w-[250px] capitalize">
                           {perm.module.replace(/_/g, " ")}
                         </TableCell>
-                        <TableCell className="text-center">
+                        <TableCell className="text-center w-[100px] min-w-[100px]">
                           <input
                             type="checkbox"
                             checked={rolePermissions.includes(perm.id)}
@@ -1194,8 +1194,8 @@ export function UserManagementPanel({ defaultTab = "users" }: { defaultTab?: str
                             className="size-4 rounded border-slate-800 bg-slate-900 text-primary focus:ring-primary/20 cursor-pointer"
                           />
                         </TableCell>
-                        <TableCell className="text-slate-400 text-xs">{perm.action}</TableCell>
-                        <TableCell className="text-slate-500 text-xs">{perm.description || "—"}</TableCell>
+                        <TableCell className="text-slate-400 text-xs w-[180px] min-w-[180px]">{perm.action}</TableCell>
+                        <TableCell className="text-slate-500 text-xs whitespace-normal break-words">{perm.description || "—"}</TableCell>
                       </TableRow>
                     ))}
                 </TableBody>
