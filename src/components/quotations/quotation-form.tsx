@@ -12,7 +12,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { calcTotals, TAX_OPTIONS, formatINR } from "@/lib/quotation-utils";
 import type { Quotation, QuotationItem, QuotationTaxType, CompanyBankAccount } from "@/types";
-import { cn } from "@/lib/utils";
+import { cn, safeUUID } from "@/lib/utils";
 
 // ── Default Terms ─────────────────────────────────────────────
 const DEFAULT_TERMS = `1) PRICES : Ex-works, Belgaum.
@@ -83,7 +83,7 @@ interface QuotationFormProps {
 
 function makeItem(overrides: Partial<ItemDraft> = {}): ItemDraft {
   return {
-    _key: crypto.randomUUID(),
+    _key: safeUUID(),
     product_name: "",
     description: "",
     hsn_code: "",

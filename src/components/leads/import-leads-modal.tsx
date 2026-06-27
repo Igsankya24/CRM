@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { toast } from 'sonner';
+import { safeUUID } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -113,7 +114,7 @@ export function ImportLeadsModal({ open, onOpenChange, onImported }: ImportLeads
       return {
         account_id: accountId,
         platform,
-        external_lead_id: 'manual_' + crypto.randomUUID().replace(/-/g, '').slice(0, 16),
+        external_lead_id: 'manual_' + safeUUID().replace(/-/g, '').slice(0, 16),
         buyer_name: buyerName || null,
         company_name: companyName || null,
         mobile: mobile || null,

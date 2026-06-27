@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Building2, Globe, Phone, Mail, Clock, MapPin, FileText, Save, Loader2, CheckCircle2, Landmark, Upload, Trash2, Layout, Plus, Star, Check } from 'lucide-react'
 import type { CompanyBankAccount } from '@/types'
 import { toast } from 'sonner'
+import { safeUUID } from '@/lib/utils'
 
 interface CompanySettingsData {
   company_name: string
@@ -514,7 +515,7 @@ export function CompanySettingsPanel() {
       const { id, account_id, created_at, updated_at, ...rest } = ba
       if (id.startsWith('temp_')) {
         return {
-          id: crypto.randomUUID(),
+          id: safeUUID(),
           account_id: accountId,
           ...rest
         }
