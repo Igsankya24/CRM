@@ -58,7 +58,11 @@ export function ProformaActions({
       const res = await fetch(`/api/proformas/${proforma.id}/convert`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to convert");
-      toast.success("Converted to Sales Register!");
+      if (data.alreadyExists) {
+        toast.info(data.message || "This Proforma has already been converted to Sales Register.");
+      } else {
+        toast.success("Converted to Sales Register!");
+      }
       router.push(`/sales-registers/${data.salesRegister.id}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Conversion failed");

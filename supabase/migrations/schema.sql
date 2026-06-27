@@ -6173,7 +6173,7 @@ ALTER TABLE public.company_settings
 -- Quotation status enum
 DO $$ BEGIN
   CREATE TYPE public.quotation_status AS ENUM (
-    'draft','sent','accepted','rejected','expired'
+    'draft','sent','accepted','rejected','expired','converted'
   );
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
@@ -6783,7 +6783,7 @@ END $$;
 -- 1. Enums
 DO $$ BEGIN
   CREATE TYPE public.proforma_status AS ENUM (
-    'draft', 'issued', 'waiting_payment', 'partially_paid', 'paid', 'cancelled'
+    'draft', 'issued', 'waiting_payment', 'partially_paid', 'paid', 'cancelled', 'converted'
   );
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
@@ -7186,6 +7186,21 @@ END $$;
 DO $$
 BEGIN
   ALTER TYPE public.quotation_status ADD VALUE 'cancelled';
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+-- Add converted status to quotation_status and proforma_status enums (if missing)
+DO $$
+BEGIN
+  ALTER TYPE public.quotation_status ADD VALUE 'converted';
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  ALTER TYPE public.proforma_status ADD VALUE 'converted';
 EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;

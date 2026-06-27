@@ -41,10 +41,11 @@ export async function POST(
 
     if (checkErr) throw checkErr;
     if (existingSalesRegister) {
-      return NextResponse.json(
-        { error: `This proforma has already been converted to Sales Register ${existingSalesRegister.sales_register_no}` },
-        { status: 400 }
-      );
+      return NextResponse.json({
+        salesRegister: existingSalesRegister,
+        alreadyExists: true,
+        message: "This Proforma has already been converted to Sales Register."
+      }, { status: 200 });
     }
 
     // Check if the lead already has a sales register
@@ -58,10 +59,11 @@ export async function POST(
 
       if (dupSRErr) throw dupSRErr;
       if (dupSR) {
-        return NextResponse.json(
-          { error: "A sales register has already been generated for this lead. Duplicate invoice found." },
-          { status: 400 }
-        );
+        return NextResponse.json({
+          salesRegister: dupSR,
+          alreadyExists: true,
+          message: "This Proforma has already been converted to Sales Register."
+        }, { status: 200 });
       }
     }
 
@@ -105,41 +107,6 @@ export async function POST(
         manager_designation: proforma.manager_designation,
         lead_id: proforma.lead_id,
         valid_until: proforma.valid_until,
-        transportation_charges: proforma.transportation_charges || 0,
-        packing_charges: proforma.packing_charges || 0,
-        other_charges: proforma.other_charges || 0,
-        reference_number: proforma.reference_number,
-        notes: proforma.notes,
-        approval_status: proforma.approval_status || "pending",
-        document_type: "sales_register",
-        document_relationships: [
-          ...(proforma.document_relationships || []),
-          {
-            type: "parent_proforma",
-            id: proforma.id,
-            number: proforma.proforma_no,
-            date: proforma.entry_date,
-          }
-        ],
-        audit_history: [
-          ...(proforma.audit_history || []),
-          {
-            timestamp: new Date().toISOString(),
-            user_id: user.id,
-            action: "convert_from_proforma",
-            details: `Converted from Proforma Invoice ${proforma.proforma_no}`
-          }
-        ],
-        conversion_history: [
-          ...(proforma.conversion_history || []),
-          {
-            timestamp: new Date().toISOString(),
-            from: "proforma",
-            from_id: proforma.id,
-            to: "sales_register",
-            by: user.id
-          }
-        ],
         created_by: user.id,
         updated_by: user.id,
       })
@@ -172,7 +139,7 @@ export async function POST(
       .eq("account_id", proforma.account_id)
       .maybeSingle();
 
-    const salesTerms = companySettings?.sales_register_terms_text || "";
+    const salesTerms = proforma.terms?.terms_text || companySettings?.sales_register_terms_text || "";
 
     const { error: termsErr } = await supabase
       .from("sales_register_terms")
@@ -205,10 +172,56 @@ export async function POST(
       note: `Converted from Proforma Invoice ${proforma.proforma_no}`,
     });
 
+    // 8. Update status of parent proforma to 'converted' (safe wrapper)
+    try {
+      const { error: updError } = await supabase
+        .from("proformas")
+        .update({ status: "converted" })
+        .eq("id", id);
+      if (updError) {
+        console.warn("Could not update proforma status to 'converted':", updError.message);
+      } else {
+        // Record status history for Proforma
+        await supabase.from("proforma_status_history").insert({
+          proforma_id: id,
+          old_status: proforma.status,
+          new_status: "converted",
+          changed_by: user.id,
+          note: `Converted to Sales Register ${srNo}`,
+        });
+      }
+    } catch (e) {
+      console.warn("Failed to update proforma status to 'converted':", e);
+    }
+
+    // 9. Update status of parent quotation to 'converted' (safe wrapper)
+    if (proforma.parent_quotation_id) {
+      try {
+        const { error: qUpdError } = await supabase
+          .from("quotations")
+          .update({ status: "converted" })
+          .eq("id", proforma.parent_quotation_id);
+        if (qUpdError) {
+          console.warn("Could not update quotation status to 'converted':", qUpdError.message);
+        } else {
+          // Record status history for Quotation
+          await supabase.from("quotation_status_history").insert({
+            quotation_id: proforma.parent_quotation_id,
+            old_status: null,
+            new_status: "converted",
+            changed_by: user.id,
+            note: `Converted to Sales Register via Proforma`,
+          });
+        }
+      } catch (e) {
+        console.warn("Failed to update quotation status to 'converted':", e);
+      }
+    }
+
     return NextResponse.json({ salesRegister, sales_register: salesRegister }, { status: 201 });
-  } catch (err) {
+  } catch (err: any) {
     console.error("[POST /api/proformas/[id]/convert]", err);
-    const msg = err instanceof Error ? err.message : "Failed to convert proforma";
+    const msg = err?.message || (typeof err === "string" ? err : "Failed to convert proforma");
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
