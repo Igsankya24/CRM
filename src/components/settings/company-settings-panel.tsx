@@ -2,9 +2,8 @@
 
 import { useCallback, useEffect, useState, useRef } from 'react'
 import { useAuth } from '@/hooks/use-auth'
-import { useBranding } from '@/hooks/use-branding'
 import { createClient } from '@/lib/supabase/client'
-import { Building2, Globe, Phone, Mail, Clock, MapPin, FileText, Save, Loader2, CheckCircle2, Landmark, Upload, Trash2, Layout, Plus, Star, Check } from 'lucide-react'
+import { Building2, Globe, Phone, Mail, Clock, MapPin, FileText, Save, Loader2, CheckCircle2, Landmark, Upload, Trash2, Plus, Star, Check } from 'lucide-react'
 import type { CompanyBankAccount } from '@/types'
 import { toast } from 'sonner'
 import { safeUUID } from '@/lib/utils'
@@ -105,7 +104,6 @@ const INITIAL: CompanySettingsData = {
 
 export function CompanySettingsPanel() {
   const { accountId } = useAuth()
-  const { refresh: refreshBranding } = useBranding()
   const [form, setForm] = useState<CompanySettingsData>(INITIAL)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -142,17 +140,7 @@ export function CompanySettingsPanel() {
   const [sealPreview, setSealPreview] = useState<string | null>(null)
   const [removeSeal, setRemoveSeal] = useState(false)
 
-  // CRM Branding State
-  const [crmName, setCrmName] = useState('')
-  const crmLogoInputRef = useRef<HTMLInputElement>(null)
-  const [crmLogoFile, setCrmLogoFile] = useState<File | null>(null)
-  const [crmLogoPreview, setCrmLogoPreview] = useState<string | null>(null)
-  const [removeCrmLogo, setRemoveCrmLogo] = useState(false)
 
-  const crmFaviconInputRef = useRef<HTMLInputElement>(null)
-  const [crmFaviconFile, setCrmFaviconFile] = useState<File | null>(null)
-  const [crmFaviconPreview, setCrmFaviconPreview] = useState<string | null>(null)
-  const [removeCrmFavicon, setRemoveCrmFavicon] = useState(false)
 
   // Clean up object URLs to avoid memory leaks
   useEffect(() => {
@@ -160,30 +148,14 @@ export function CompanySettingsPanel() {
       if (logoPreview && logoPreview.startsWith('blob:')) URL.revokeObjectURL(logoPreview)
       if (signaturePreview && signaturePreview.startsWith('blob:')) URL.revokeObjectURL(signaturePreview)
       if (sealPreview && sealPreview.startsWith('blob:')) URL.revokeObjectURL(sealPreview)
-      if (crmLogoPreview && crmLogoPreview.startsWith('blob:')) URL.revokeObjectURL(crmLogoPreview)
-      if (crmFaviconPreview && crmFaviconPreview.startsWith('blob:')) URL.revokeObjectURL(crmFaviconPreview)
     }
-  }, [logoPreview, signaturePreview, sealPreview, crmLogoPreview, crmFaviconPreview])
+  }, [logoPreview, signaturePreview, sealPreview])
 
   // Load existing settings
   const loadSettings = useCallback(async () => {
     if (!accountId) return
     setLoading(true)
 
-    // Load CRM settings
-    try {
-      const res = await fetch('/api/settings/branding')
-      if (res.ok) {
-        const brandingData = await res.json()
-        if (brandingData.settings) {
-          setCrmName(brandingData.settings.app_name ?? '')
-          setCrmLogoPreview(brandingData.settings.logo_url ?? null)
-          setCrmFaviconPreview(brandingData.settings.favicon_url ?? null)
-        }
-      }
-    } catch (err) {
-      console.error('Failed to load CRM branding settings:', err)
-    }
 
     const { data } = await supabase
       .from('company_settings')
@@ -295,72 +267,6 @@ export function CompanySettingsPanel() {
     setRemoveLogo(true)
   }
 
-  const handleCrmLogoPick = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    const allowedTypes = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml', 'image/webp'])
-    if (!allowedTypes.has(file.type)) {
-      alert('Unsupported logo format. PNG, JPG, JPEG, SVG, and WebP are supported.')
-      return
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      alert('File is too large. Maximum size is 2 MB.')
-      return
-    }
-
-    if (crmLogoPreview && crmLogoPreview.startsWith('blob:')) {
-      URL.revokeObjectURL(crmLogoPreview)
-    }
-    setCrmLogoFile(file)
-    crmLogoPreview && crmLogoPreview.startsWith('blob:') && URL.revokeObjectURL(crmLogoPreview)
-    setCrmLogoPreview(URL.createObjectURL(file))
-    setRemoveCrmLogo(false)
-  }
-
-  const handleRemoveCrmLogo = () => {
-    if (crmLogoPreview && crmLogoPreview.startsWith('blob:')) {
-      URL.revokeObjectURL(crmLogoPreview)
-    }
-    setCrmLogoFile(null)
-    setCrmLogoPreview(null)
-    setRemoveCrmLogo(true)
-  }
-
-  const handleCrmFaviconPick = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    const allowedTypes = new Set(['image/png', 'image/x-icon', 'image/vnd.microsoft.icon', 'image/svg+xml'])
-    const ext = file.name.split('.').pop()?.toLowerCase()
-    const isIco = ext === 'ico'
-
-    if (!allowedTypes.has(file.type) && !isIco) {
-      alert('Unsupported favicon format. PNG, ICO, and SVG are supported.')
-      return
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      alert('File is too large. Maximum size is 2 MB.')
-      return
-    }
-
-    if (crmFaviconPreview && crmFaviconPreview.startsWith('blob:')) {
-      URL.revokeObjectURL(crmFaviconPreview)
-    }
-    setCrmFaviconFile(file)
-    crmFaviconPreview && crmFaviconPreview.startsWith('blob:') && URL.revokeObjectURL(crmFaviconPreview)
-    setCrmFaviconPreview(URL.createObjectURL(file))
-    setRemoveCrmFavicon(false)
-  }
-
-  const handleRemoveCrmFavicon = () => {
-    if (crmFaviconPreview && crmFaviconPreview.startsWith('blob:')) {
-      URL.revokeObjectURL(crmFaviconPreview)
-    }
-    setCrmFaviconFile(null)
-    setCrmFaviconPreview(null)
-    setRemoveCrmFavicon(true)
-  }
 
   const handleSignaturePick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -417,27 +323,7 @@ export function CompanySettingsPanel() {
     setSaving(true)
     setSaved(false)
 
-    // 1. Save CRM branding settings
-    try {
-      const brandingFormData = new FormData()
-      brandingFormData.append('appName', crmName.trim() || form.company_name || 'CRM with AI')
-      brandingFormData.append('removeLogo', String(removeCrmLogo))
-      brandingFormData.append('removeFavicon', String(removeCrmFavicon))
-      if (crmLogoFile) brandingFormData.append('logo', crmLogoFile)
-      if (crmFaviconFile) brandingFormData.append('favicon', crmFaviconFile)
-
-      const brandingRes = await fetch('/api/settings/branding', { method: 'POST', body: brandingFormData })
-      if (!brandingRes.ok) {
-        const brandingErr = await brandingRes.json()
-        console.error('Failed to save CRM branding:', brandingErr.error)
-      } else {
-        await refreshBranding()
-      }
-    } catch (err) {
-      console.error('Error saving CRM branding:', err)
-    }
-
-    // 2. Save company logo if changed
+    // 1. Save company logo if changed
     let finalLogoUrl = form.logo_url
     if (logoFile || removeLogo) {
       try {
@@ -585,10 +471,7 @@ export function CompanySettingsPanel() {
     setRemoveSignature(false)
     setSealFile(null)
     setRemoveSeal(false)
-    setCrmLogoFile(null)
-    setRemoveCrmLogo(false)
-    setCrmFaviconFile(null)
-    setRemoveCrmFavicon(false)
+
     setTimeout(() => setSaved(false), 3000)
   }
 
@@ -708,107 +591,6 @@ export function CompanySettingsPanel() {
 
   return (
     <div className="space-y-8">
-      {/* CRM Branding */}
-      <Section icon={<Layout className="h-5 w-5" />} title="CRM Branding" description="Configure the name, logo, and favicon displayed on the login page, sidebar, and browser tab.">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <InputField
-            label="CRM Name (App Name)"
-            value={crmName}
-            onChange={setCrmName}
-            placeholder="Phoenix CRM"
-          />
-        </div>
-
-        <div className="grid gap-6 sm:grid-cols-2 pt-2 border-t border-border/50">
-          {/* CRM Logo Upload */}
-          <div className="flex flex-col gap-3">
-            <label className="text-xs font-medium text-muted-foreground">CRM Logo</label>
-            <div className="flex items-center gap-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-lg border border-border bg-slate-900 overflow-hidden">
-                {crmLogoPreview ? (
-                  <img src={crmLogoPreview} alt="CRM Logo" className="h-full w-full object-contain" />
-                ) : (
-                  <Layout className="h-8 w-8 text-muted-foreground/40" />
-                )}
-              </div>
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="file"
-                    ref={crmLogoInputRef}
-                    onChange={handleCrmLogoPick}
-                    accept="image/png, image/jpeg, image/jpg, image/svg+xml, image/webp"
-                    className="hidden"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => crmLogoInputRef.current?.click()}
-                    className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-slate-800 text-foreground transition-colors"
-                  >
-                    Change Logo
-                  </button>
-                  {crmLogoPreview && (
-                    <button
-                      type="button"
-                      onClick={handleRemoveCrmLogo}
-                      className="rounded-lg border border-red-500/20 text-red-400 px-3 py-1.5 text-xs font-medium hover:bg-red-500/10 transition-colors"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-                <p className="text-[10px] text-muted-foreground">
-                  PNG, JPG, SVG or WebP. Max 2MB.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* CRM Favicon Upload */}
-          <div className="flex flex-col gap-3">
-            <label className="text-xs font-medium text-muted-foreground">Browser Favicon</label>
-            <div className="flex items-center gap-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-lg border border-border bg-slate-900 overflow-hidden">
-                {crmFaviconPreview ? (
-                  <img src={crmFaviconPreview} alt="Favicon" className="h-8 w-8 object-contain" />
-                ) : (
-                  <Globe className="h-8 w-8 text-muted-foreground/40" />
-                )}
-              </div>
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="file"
-                    ref={crmFaviconInputRef}
-                    onChange={handleCrmFaviconPick}
-                    accept="image/png, image/x-icon, image/vnd.microsoft.icon, image/svg+xml"
-                    className="hidden"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => crmFaviconInputRef.current?.click()}
-                    className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-slate-800 text-foreground transition-colors"
-                  >
-                    Change Favicon
-                  </button>
-                  {crmFaviconPreview && (
-                    <button
-                      type="button"
-                      onClick={handleRemoveCrmFavicon}
-                      className="rounded-lg border border-red-500/20 text-red-400 px-3 py-1.5 text-xs font-medium hover:bg-red-500/10 transition-colors"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-                <p className="text-[10px] text-muted-foreground">
-                  PNG, ICO or SVG. Max 2MB.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Section>
 
       {/* Company Identity */}
       <Section icon={<Building2 className="h-5 w-5" />} title="Company Identity" description="Basic company information used by the AI assistant to introduce your business.">
