@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { BrandingProvider } from "@/hooks/use-branding";
 import { createClient } from "@/lib/supabase/server";
+import { AuthProvider } from "@/hooks/use-auth";
 
 export async function generateMetadata(): Promise<Metadata> {
   let appName = "CRM with AI";
@@ -72,7 +73,9 @@ export default async function RootLayout({
       <body className="min-h-full bg-background text-foreground font-sans">
         <BrandingProvider initialSettings={initialBranding}>
           <ThemeProvider>
-            {children}
+            <AuthProvider>
+              {children}
+            </AuthProvider>
             <Toaster
               theme="dark"
               position="top-right"

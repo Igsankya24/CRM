@@ -6,6 +6,32 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 // because another request stole it") and intermittent fetch failures.
 let browserClient: SupabaseClient | undefined
 
+const customStorage = {
+  getItem: (key: string): string | null => {
+    if (typeof window === "undefined") return null;
+    const rememberMe = window.localStorage.getItem("crm_remember_me") === "true";
+    if (rememberMe) {
+      return window.localStorage.getItem(key);
+    } else {
+      return window.sessionStorage.getItem(key);
+    }
+  },
+  setItem: (key: string, value: string): void => {
+    if (typeof window === "undefined") return;
+    const rememberMe = window.localStorage.getItem("crm_remember_me") === "true";
+    if (rememberMe) {
+      window.localStorage.setItem(key, value);
+    } else {
+      window.sessionStorage.setItem(key, value);
+    }
+  },
+  removeItem: (key: string): void => {
+    if (typeof window === "undefined") return;
+    window.localStorage.removeItem(key);
+    window.sessionStorage.removeItem(key);
+  }
+}
+
 export function createClient() {
   if (browserClient) return browserClient
 
@@ -28,7 +54,13 @@ export function createClient() {
   }
   console.log("Supabase Client initialized with URL:", url);
 
-  browserClient = createBrowserClient(url, key)
+  browserClient = createBrowserClient(url, key, {
+    auth: {
+      storage: typeof window !== 'undefined' ? customStorage : undefined,
+      persistSession: true,
+      detectSessionInUrl: true
+    }
+  })
 
   return browserClient
 }

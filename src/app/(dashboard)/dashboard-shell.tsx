@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { AuthProvider, useAuth } from "@/hooks/use-auth";
+import { useAuth } from "@/hooks/use-auth";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -151,7 +151,7 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!loading && !user) {
-      router.push("/login");
+      router.push(`/login?returnUrl=${encodeURIComponent(pathname)}`);
       return;
     }
 
@@ -168,8 +168,6 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
           router.push("/proformas");
         } else if (hasAnyPermission([{ module: "sales", action: "view" }])) {
           router.push("/sales-registers");
-        } else {
-          router.push("/profile");
         }
       }
     }
@@ -223,7 +221,7 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
                   } else if (hasAnyPermission([{ module: "enquiries", action: "view" }, { module: "leads", action: "view" }])) {
                     router.push("/leads");
                   } else {
-                    router.push("/profile");
+                    router.push("/dashboard");
                   }
                 }}
                 className="w-full bg-primary text-white hover:bg-primary/90"
@@ -251,9 +249,5 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
 }
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
-  return (
-    <AuthProvider>
-      <DashboardShellInner>{children}</DashboardShellInner>
-    </AuthProvider>
-  );
+  return <DashboardShellInner>{children}</DashboardShellInner>;
 }

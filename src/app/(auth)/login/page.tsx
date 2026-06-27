@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/card";
 import { MessageSquare, UsersRound } from "lucide-react";
 import { useBranding } from "@/hooks/use-branding";
+import { useAuth } from "@/hooks/use-auth";
 
 // `useSearchParams` opts the component out of static prerendering
 // unless it sits under a Suspense boundary. We split the form into
@@ -37,18 +38,42 @@ function LoginPageInner() {
   // account. After a successful sign-in we send them to the join
   // page to accept rather than to /dashboard.
   const inviteToken = searchParams.get("invite");
+  const returnUrl = searchParams.get("returnUrl");
+  const safeReturnUrl = (returnUrl && returnUrl.startsWith("/") && !returnUrl.startsWith("//")) ? returnUrl : "/dashboard";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const supabase = createClient();
+  const { user, loading: authLoading } = useAuth();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (!authLoading && user) {
+      if (inviteToken) {
+        router.push(`/join/${encodeURIComponent(inviteToken)}`);
+      } else {
+        router.push(safeReturnUrl);
+      }
+    }
+  }, [user, authLoading, safeReturnUrl, inviteToken, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
+
+    // Save rememberMe selection
+    if (rememberMe) {
+      localStorage.setItem("crm_remember_me", "true");
+      document.cookie = `crm_remember_me=true; path=/; max-age=${30 * 24 * 60 * 60}; SameSite=Lax; Secure`;
+    } else {
+      localStorage.setItem("crm_remember_me", "false");
+      document.cookie = "crm_remember_me=false; path=/; SameSite=Lax; Secure";
+    }
 
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -64,7 +89,7 @@ function LoginPageInner() {
     if (inviteToken) {
       router.push(`/join/${encodeURIComponent(inviteToken)}`);
     } else {
-      router.push("/dashboard");
+      router.push(safeReturnUrl);
     }
   };
 
@@ -134,6 +159,22 @@ function LoginPageInner() {
                 required
                 className="border-slate-700 bg-slate-800 text-white placeholder:text-slate-500 focus-visible:border-primary focus-visible:ring-primary/20"
               />
+            </div>
+
+            <div className="flex items-center gap-2 mt-1">
+              <input
+                id="rememberMe"
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-700 bg-slate-800 text-primary focus:ring-primary/20 accent-primary cursor-pointer"
+              />
+              <label
+                htmlFor="rememberMe"
+                className="text-sm font-medium leading-none text-slate-300 cursor-pointer select-none"
+              >
+                Remember Me
+              </label>
             </div>
 
             <Button

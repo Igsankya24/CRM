@@ -20,6 +20,15 @@ import {
   isAccountRole,
   type AccountRole,
 } from "@/lib/auth/roles";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 interface Profile {
   id: string;
@@ -212,14 +221,98 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [fetchProfile]);
 
+  const clearSessionData = useCallback(() => {
+    // Clear all cookies
+    try {
+      document.cookie.split(";").forEach((cookie) => {
+        const eqPos = cookie.indexOf("=");
+        const name = eqPos > -1 ? cookie.substring(0, eqPos).trim() : cookie.trim();
+        document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;SameSite=Lax;Secure`;
+      });
+    } catch (e) {
+      console.warn("[clearSessionData] Failed to clear cookies:", e);
+    }
+
+    // Clear LocalStorage
+    try {
+      localStorage.clear();
+    } catch (e) {
+      console.warn("[clearSessionData] Failed to clear localStorage:", e);
+    }
+
+    // Clear SessionStorage
+    try {
+      sessionStorage.clear();
+    } catch (e) {
+      console.warn("[clearSessionData] Failed to clear sessionStorage:", e);
+    }
+  }, []);
+
   const signOut = useCallback(async () => {
     const supabase = createClient();
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error("[AuthProvider] signOut error:", e);
+    }
     setUser(null);
     setProfile(null);
     setAccount(null);
+    clearSessionData();
     window.location.href = "/login";
-  }, [setProfile]);
+  }, [setProfile, clearSessionData]);
+
+  // Inactivity tracking and session auto-logout (60 minutes = 3,600,000 ms, warning at 55 minutes = 3,300,000 ms)
+  const [showWarning, setShowWarning] = useState(false);
+  const TIMEOUT_MS = 60 * 60 * 1000;
+  const WARNING_MS = 55 * 60 * 1000;
+
+  const resetInactivityTimer = useCallback(() => {
+    const now = Date.now();
+    localStorage.setItem("crm_last_activity", now.toString());
+    setShowWarning(false);
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setShowWarning(false);
+      return;
+    }
+
+    // Set initial activity timestamp
+    localStorage.setItem("crm_last_activity", Date.now().toString());
+
+    const handleActivity = () => {
+      resetInactivityTimer();
+    };
+
+    const events = ["mousemove", "keydown", "click", "touchstart", "scroll"];
+    events.forEach((event) => {
+      window.addEventListener(event, handleActivity, { passive: true });
+    });
+
+    const interval = setInterval(() => {
+      const lastActivityStr = localStorage.getItem("crm_last_activity");
+      const lastActivity = lastActivityStr ? parseInt(lastActivityStr, 10) : Date.now();
+      const timeSinceLastActivity = Date.now() - lastActivity;
+
+      if (timeSinceLastActivity >= TIMEOUT_MS) {
+        console.log("[AuthProvider] Session expired due to inactivity.");
+        signOut();
+      } else if (timeSinceLastActivity >= WARNING_MS) {
+        setShowWarning(true);
+      } else {
+        setShowWarning(false);
+      }
+    }, 5000); // Check every 5 seconds
+
+    return () => {
+      events.forEach((event) => {
+        window.removeEventListener(event, handleActivity);
+      });
+      clearInterval(interval);
+    };
+  }, [user, resetInactivityTimer, signOut]);
 
   const refreshProfile = useCallback(async () => {
     if (!user?.id) return;
@@ -260,6 +353,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }}
     >
       {children}
+      <Dialog open={showWarning} onOpenChange={(open) => { if (!open) resetInactivityTimer(); }}>
+        <DialogContent showCloseButton={false} className="border-slate-800 bg-slate-900 text-white sm:max-w-md">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="text-xl font-bold text-white">Session Expiring</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Your session will expire in 5 minutes due to inactivity.
+              Click Continue to remain signed in.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2 sm:justify-end">
+            <Button variant="outline" onClick={signOut} className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-white">
+              Logout Now
+            </Button>
+            <Button onClick={resetInactivityTimer} className="bg-primary text-white hover:bg-primary/90">
+              Continue Session
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AuthContext.Provider>
   );
 }
