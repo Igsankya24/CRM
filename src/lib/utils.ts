@@ -15,3 +15,9 @@ export function safeUUID(): string {
     return v.toString(16);
   });
 }
+
+export function isValidUUID(uuid: string | null | undefined): boolean {
+  if (!uuid) return false;
+  const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return regex.test(uuid);
+}

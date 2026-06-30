@@ -93,6 +93,16 @@ export interface KnowledgeContext {
     source: string | null
     stage: string | null
   } | null
+  bankDetails: {
+    account_name: string
+    account_type: string
+    account_number: string
+    bank_name: string
+    bank_ifsc: string
+    branch_name?: string | null
+    swift_code?: string | null
+    upi_id?: string | null
+  } | null
 }
 
 // ─── Data Loaders ───────────────────────────────────────────────────────
@@ -115,6 +125,28 @@ export async function loadCompanySettings(
     return null
   }
   return data ?? null
+}
+
+/**
+ * Loads default bank details for an account.
+ */
+export async function loadDefaultBankDetails(
+  accountId: string
+): Promise<any | null> {
+  const supabase = getAdminClient()
+  const { data, error } = await supabase
+    .from('company_bank_accounts')
+    .select('*')
+    .eq('account_id', accountId)
+    .order('created_at', { ascending: true })
+
+  if (error) {
+    console.error('[knowledge-engine] Failed to load company bank details:', error.message)
+    return null
+  }
+  if (!data || data.length === 0) return null
+  const defaultAcc = data.find(b => b.is_default) || data[0]
+  return defaultAcc
 }
 
 /**
@@ -217,13 +249,14 @@ export async function assembleKnowledgeContext(
   customerMemoryBlock: string
 ): Promise<KnowledgeContext> {
   // Load all knowledge sources in parallel for speed
-  const [companySettings, products, faq, conversationMemory, leadInfo] =
+  const [companySettings, products, faq, conversationMemory, leadInfo, bankDetails] =
     await Promise.all([
       loadCompanySettings(accountId),
       loadCompanyProducts(accountId),
       loadCompanyFaq(accountId),
       loadConversationMemory(conversationId),
       loadLinkedLeadInfo(accountId, conversationId),
+      loadDefaultBankDetails(accountId),
     ])
 
   return {
@@ -233,6 +266,7 @@ export async function assembleKnowledgeContext(
     conversationMemory,
     customerMemoryBlock,
     leadInfo,
+    bankDetails,
   }
 }
 
@@ -344,6 +378,21 @@ export function buildKnowledgePromptBlock(ctx: KnowledgeContext): string {
   // ── Customer Memory (per-phone, from existing customer_memory table) ──
   if (ctx.customerMemoryBlock) {
     sections.push(ctx.customerMemoryBlock)
+  }
+
+  // ── Bank Details (Live Company Settings) ──
+  if (ctx.bankDetails) {
+    const bd = ctx.bankDetails
+    const bankLines: string[] = ['## Bank Details (For Payments)']
+    if (bd.bank_name) bankLines.push(`**Bank Name:** ${bd.bank_name}`)
+    if (bd.branch_name) bankLines.push(`**Branch:** ${bd.branch_name}`)
+    if (bd.account_name) bankLines.push(`**Account Name:** ${bd.account_name}`)
+    if (bd.account_number) bankLines.push(`**Account Number:** ${bd.account_number}`)
+    if (bd.account_type) bankLines.push(`**Account Type:** ${bd.account_type}`)
+    if (bd.bank_ifsc) bankLines.push(`**IFSC Code:** ${bd.bank_ifsc}`)
+    if (bd.swift_code) bankLines.push(`**SWIFT Code:** ${bd.swift_code}`)
+    if (bd.upi_id) bankLines.push(`**UPI ID:** ${bd.upi_id}`)
+    sections.push(bankLines.join('\n'))
   }
 
   return sections.join('\n\n')

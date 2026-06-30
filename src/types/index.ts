@@ -1097,6 +1097,9 @@ export interface CompanyBankAccount {
   account_number: string;
   bank_name: string;
   bank_ifsc: string;
+  branch_name?: string | null;
+  swift_code?: string | null;
+  upi_id?: string | null;
   is_default: boolean;
   created_at?: string;
   updated_at?: string;

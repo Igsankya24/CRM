@@ -19,7 +19,8 @@ import {
   Pin,
   Archive,
   Ban,
-  CheckCircle2
+  CheckCircle2,
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -50,6 +51,7 @@ interface ContactSidebarProps {
   conversation: Conversation | null;
   onRefresh?: () => void;
   profiles?: Profile[];
+  onClose?: () => void;
 }
 
 type TabType = "overview" | "notes" | "followups" | "history" | "insights" | "settings";
@@ -58,7 +60,8 @@ export function ContactSidebar({
   contact,
   conversation,
   onRefresh,
-  profiles = []
+  profiles = [],
+  onClose,
 }: ContactSidebarProps) {
   const { user, accountId } = useAuth();
   const contactPhone = contact?.phone;
@@ -640,7 +643,16 @@ export function ContactSidebar({
 
   if (!contact) {
     return (
-      <div className="flex h-full w-[25%] min-w-[280px] items-center justify-center border-l border-slate-800 bg-slate-900">
+      <div className="flex h-full w-full items-center justify-center border-l border-slate-800 bg-slate-900 relative">
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="absolute top-3 right-3 flex h-7 w-7 items-center justify-center rounded-full text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+            aria-label="Close contact panel"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
         <p className="text-sm text-slate-500">Select a conversation</p>
       </div>
     );
@@ -659,9 +671,18 @@ export function ContactSidebar({
   };
 
   return (
-    <div className="flex h-full w-[25%] min-w-[280px] flex-col border-l border-slate-800 bg-slate-900 shrink-0">
-      {/* Customer Profile Card */}
-      <div className="p-4 border-b border-slate-800/80 bg-slate-900/50 shrink-0 flex flex-col items-center text-center">
+    <div className="flex h-full w-full flex-col border-l border-slate-800 bg-slate-900 shrink-0">
+      {/* Customer Profile Card — with close button */}
+      <div className="p-4 border-b border-slate-800/80 bg-slate-900/50 shrink-0 flex flex-col items-center text-center relative">
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="absolute top-3 right-3 flex h-7 w-7 items-center justify-center rounded-full text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+            aria-label="Close contact panel"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-700 text-base font-semibold text-white">
           {contact.avatar_url ? (
             <img

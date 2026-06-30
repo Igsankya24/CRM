@@ -126,6 +126,8 @@ export async function getAIResponse(
       content: m.content_text!,
     }))
 
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
   let candidates = [currentModel]
   if (options.onlyFree) {
     if (freeModelsList.length === 0) {
@@ -143,9 +145,19 @@ export async function getAIResponse(
     ]
   }
 
+  // Append cheap paid models as last-resort fallback to bypass free model rate limit (429)
+  const fallbacks = ['google/gemini-2.5-flash', 'meta-llama/llama-3.3-70b-instruct']
+  for (const f of fallbacks) {
+    if (!candidates.includes(f)) {
+      candidates.push(f)
+    }
+  }
+
   let lastError: unknown = null
-  // Try up to 4 models to bypass rate limits or API outages of individual free models
-  for (const candidate of candidates.slice(0, 4)) {
+  let i = 0
+  // Try up to 5 models to bypass rate limits or API outages
+  while (i < candidates.length && i < 5) {
+    const candidate = candidates[i]
     try {
       console.log(`[agent] Attempting AI response with model: ${candidate}`)
       const completion = await client.chat.completions.create({
@@ -169,6 +181,22 @@ export async function getAIResponse(
     } catch (err) {
       console.warn(`[agent] Failed to generate response with model ${candidate}:`, err)
       lastError = err
+
+      // Detect 429 Rate Limit and filter remaining candidates
+      const isRateLimit = err && (
+        (err as any).status === 429 ||
+        (err as any).code === 429 ||
+        String((err as any).message || '').includes('429') ||
+        String((err as any).message || '').toLowerCase().includes('rate limit')
+      )
+      if (isRateLimit) {
+        console.warn(`[agent] Rate limit hit (429) on model ${candidate}. Filtering out other free models from candidates list...`)
+        const processed = candidates.slice(0, i + 1)
+        const remaining = candidates.slice(i + 1).filter(c => !c.endsWith(':free'))
+        candidates = [...processed, ...remaining]
+        await sleep(1000)
+      }
+      i++
     }
   }
 
@@ -183,6 +211,7 @@ export async function getAIResponseSimple(
   messages: { role: 'user' | 'assistant'; content: string }[],
   options: AIAgentOptions = {}
 ): Promise<string> {
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
   const client = getAIClient(undefined, options.openrouterApiKey)
   const initialModel = resolveModel(options.model)
   const systemPrompt = getSystemPrompt(options.systemPrompt)
@@ -212,9 +241,19 @@ export async function getAIResponseSimple(
     ]
   }
 
+  // Append cheap paid models as last-resort fallback
+  const fallbacks = ['google/gemini-2.5-flash', 'meta-llama/llama-3.3-70b-instruct']
+  for (const f of fallbacks) {
+    if (!candidates.includes(f)) {
+      candidates.push(f)
+    }
+  }
+
   let lastError: unknown = null
-  // Try up to 4 models to bypass rate limits or API outages of individual free models
-  for (const candidate of candidates.slice(0, 4)) {
+  let i = 0
+  // Try up to 5 models to bypass rate limits or API outages
+  while (i < candidates.length && i < 5) {
+    const candidate = candidates[i]
     try {
       console.log(`[agent] Attempting simple AI response with model: ${candidate}`)
       const completion = await client.chat.completions.create({
@@ -230,6 +269,22 @@ export async function getAIResponseSimple(
     } catch (err) {
       console.warn(`[agent] Failed to generate simple response with model ${candidate}:`, err)
       lastError = err
+
+      // Detect 429 Rate Limit and filter remaining candidates
+      const isRateLimit = err && (
+        (err as any).status === 429 ||
+        (err as any).code === 429 ||
+        String((err as any).message || '').includes('429') ||
+        String((err as any).message || '').toLowerCase().includes('rate limit')
+      )
+      if (isRateLimit) {
+        console.warn(`[agent] Rate limit hit (429) on model ${candidate}. Filtering out other free models...`)
+        const processed = candidates.slice(0, i + 1)
+        const remaining = candidates.slice(i + 1).filter(c => !c.endsWith(':free'))
+        candidates = [...processed, ...remaining]
+        await sleep(1000)
+      }
+      i++
     }
   }
 

@@ -34,6 +34,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { isValidUUID } from '@/lib/utils';
 import {
   getBroadcastStatus,
   getRecipientStatus,
@@ -157,6 +158,11 @@ export default function BroadcastDetailPage() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
+    if (!isValidUUID(broadcastId)) {
+      setError('Invalid broadcast identifier format.');
+      setLoading(false);
+      return;
+    }
     async function fetchData() {
       try {
         const supabase = createClient();
@@ -253,8 +259,11 @@ export default function BroadcastDetailPage() {
 
   if (error || !broadcast) {
     return (
-      <div className="flex h-64 flex-col items-center justify-center gap-2">
-        <p className="text-sm text-red-400">{error ?? 'Broadcast not found'}</p>
+      <div className="flex min-h-[50vh] flex-col items-center justify-center text-center p-6 bg-slate-900 border border-slate-800 rounded-xl my-8 max-w-2xl mx-auto w-full select-none">
+        <h2 className="text-xl font-semibold text-white mb-2">Broadcast Not Found</h2>
+        <p className="text-sm text-slate-400 mb-6 max-w-md">
+          {error ?? 'The requested broadcast could not be loaded. It may have been deleted, or the URL may be invalid.'}
+        </p>
         <Button variant="outline" onClick={() => router.push('/broadcasts')}>
           Back to Broadcasts
         </Button>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   CrmLead,
   CrmActivity,
@@ -47,6 +48,7 @@ export function LeadDetailDrawer({
   onTransition: (leadId: string, toStage: CrmStage, reason?: string) => Promise<{ success: boolean; error: string | null }>;
   onUpdate: (leadId: string, data: Partial<CrmLead>) => Promise<void>;
 }) {
+  const router = useRouter();
   const [activities, setActivities] = useState<CrmActivity[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'timeline' | 'details' | 'actions'>('timeline');
@@ -350,7 +352,7 @@ export function LeadDetailDrawer({
                     label="WhatsApp"
                     onClick={() => {
                       if (lead.phone) {
-                        window.open(`https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}`, '_blank');
+                        router.push(`/inbox?phone=${encodeURIComponent(lead.phone)}&name=${encodeURIComponent(lead.buyer_name || '')}&docType=enquiry&docId=${lead.id}`);
                       }
                     }}
                   />

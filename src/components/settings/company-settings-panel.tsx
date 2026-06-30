@@ -7,6 +7,7 @@ import { Building2, Globe, Phone, Mail, Clock, MapPin, FileText, Save, Loader2, 
 import type { CompanyBankAccount } from '@/types'
 import { toast } from 'sonner'
 import { safeUUID } from '@/lib/utils'
+import { usePermissions } from '@/hooks/use-permissions'
 
 interface CompanySettingsData {
   company_name: string
@@ -104,6 +105,7 @@ const INITIAL: CompanySettingsData = {
 
 export function CompanySettingsPanel() {
   const { accountId } = useAuth()
+  const { isSuperAdmin } = usePermissions()
   const [form, setForm] = useState<CompanySettingsData>(INITIAL)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -117,6 +119,9 @@ export function CompanySettingsPanel() {
     account_number: '',
     bank_name: '',
     bank_ifsc: '',
+    branch_name: '',
+    swift_code: '',
+    upi_id: '',
     is_default: false
   })
 
@@ -513,6 +518,9 @@ export function CompanySettingsPanel() {
       account_number: newBank.account_number.trim(),
       bank_name: newBank.bank_name.trim(),
       bank_ifsc: newBank.bank_ifsc.trim().toUpperCase(),
+      branch_name: newBank.branch_name.trim() || null,
+      swift_code: newBank.swift_code.trim().toUpperCase() || null,
+      upi_id: newBank.upi_id.trim() || null,
       is_default: newBank.is_default || bankAccounts.length === 0
     }
 
@@ -530,6 +538,9 @@ export function CompanySettingsPanel() {
       account_number: '',
       bank_name: '',
       bank_ifsc: '',
+      branch_name: '',
+      swift_code: '',
+      upi_id: '',
       is_default: false
     })
     setShowAddBank(false)
@@ -742,28 +753,33 @@ export function CompanySettingsPanel() {
                     <div className="text-xs text-muted-foreground grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
                       <div><span className="font-medium text-foreground/75">Acc:</span> {ba.account_number}</div>
                       <div><span className="font-medium text-foreground/75">Bank:</span> {ba.bank_name}</div>
+                      {ba.branch_name && <div><span className="font-medium text-foreground/75">Branch:</span> {ba.branch_name}</div>}
                       <div><span className="font-medium text-foreground/75">IFSC:</span> {ba.bank_ifsc}</div>
+                      {ba.swift_code && <div><span className="font-medium text-foreground/75">SWIFT:</span> {ba.swift_code}</div>}
+                      {ba.upi_id && <div><span className="font-medium text-foreground/75">UPI:</span> {ba.upi_id}</div>}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 self-end sm:self-center">
-                    {!ba.is_default && (
+                  {isSuperAdmin && (
+                    <div className="flex items-center gap-2 self-end sm:self-center">
+                      {!ba.is_default && (
+                        <button
+                          type="button"
+                          onClick={() => handleSetDefaultBank(ba.id)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-slate-800 hover:text-foreground transition-colors"
+                        >
+                          <Star className="h-3 w-3" /> Make Default
+                        </button>
+                      )}
                       <button
                         type="button"
-                        onClick={() => handleSetDefaultBank(ba.id)}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-slate-800 hover:text-foreground transition-colors"
+                        onClick={() => handleDeleteBank(ba.id)}
+                        className="rounded-lg border border-red-500/20 text-red-400 p-2 hover:bg-red-500/10 transition-colors"
                       >
-                        <Star className="h-3 w-3" /> Make Default
+                        <Trash2 className="h-4 w-4" />
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteBank(ba.id)}
-                      className="rounded-lg border border-red-500/20 text-red-400 p-2 hover:bg-red-500/10 transition-colors"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -812,6 +828,24 @@ export function CompanySettingsPanel() {
                 onChange={v => setNewBank(prev => ({ ...prev, bank_ifsc: v.toUpperCase() }))}
                 placeholder="CNRB0010549"
               />
+              <InputField
+                label="Branch Name"
+                value={newBank.branch_name}
+                onChange={v => setNewBank(prev => ({ ...prev, branch_name: v }))}
+                placeholder="Bhagyanagar"
+              />
+              <InputField
+                label="SWIFT Code"
+                value={newBank.swift_code}
+                onChange={v => setNewBank(prev => ({ ...prev, swift_code: v.toUpperCase() }))}
+                placeholder="CNRBINBB123"
+              />
+              <InputField
+                label="UPI ID"
+                value={newBank.upi_id}
+                onChange={v => setNewBank(prev => ({ ...prev, upi_id: v }))}
+                placeholder="phoenixproducts@okaxis"
+              />
               <div className="flex items-center gap-2 pt-6">
                 <input
                   type="checkbox"
@@ -842,7 +876,7 @@ export function CompanySettingsPanel() {
               </button>
             </div>
           </div>
-        ) : (
+        ) : isSuperAdmin ? (
           <button
             type="button"
             onClick={() => setShowAddBank(true)}
@@ -850,6 +884,10 @@ export function CompanySettingsPanel() {
           >
             <Plus className="h-4 w-4" /> Add Bank Account
           </button>
+        ) : (
+          <div className="text-xs text-muted-foreground italic p-3 border border-border rounded-xl bg-card/25 text-center mt-2">
+            Only Super Admins can add, delete, or set default bank accounts.
+          </div>
         )}
       </Section>
 

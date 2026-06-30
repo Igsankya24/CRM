@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import type { Contact, Tag, ContactTag } from '@/types';
@@ -41,6 +42,7 @@ import {
   ChevronLeft,
   ChevronRight,
   SlidersHorizontal,
+  MessageSquare,
 } from 'lucide-react';
 import { ContactForm } from '@/components/contacts/contact-form';
 import { ContactDetailView } from '@/components/contacts/contact-detail-view';
@@ -60,6 +62,7 @@ interface ContactWithTags extends Contact {
 }
 
 export default function ContactsPage() {
+  const router = useRouter();
   const supabase = createClient();
   const canEdit = useCan('send-messages');
   const canEditSettings = useCan('edit-settings');
@@ -487,7 +490,19 @@ export default function ContactsPage() {
                     {contact.name || <span className="text-slate-500 italic">Unnamed</span>}
                   </TableCell>
                   <TableCell className="text-slate-300 font-mono text-xs">
-                    {contact.phone}
+                    <div className="flex items-center gap-2">
+                      <span>{contact.phone}</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/inbox?phone=${encodeURIComponent(contact.phone)}&name=${encodeURIComponent(contact.name || '')}&docType=contact&docId=${contact.id}`);
+                        }}
+                        className="text-emerald-500 hover:text-emerald-450 hover:bg-emerald-500/10 p-1 rounded transition-colors"
+                        title="Send WhatsApp Message"
+                      >
+                        <MessageSquare className="size-3" />
+                      </button>
+                    </div>
                   </TableCell>
                   <TableCell className="text-slate-400 hidden md:table-cell text-sm">
                     {contact.email || <span className="text-slate-600">-</span>}

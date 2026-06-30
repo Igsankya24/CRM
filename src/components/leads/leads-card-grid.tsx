@@ -1,5 +1,8 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
+
+
 import {
   User,
   Building,
@@ -68,6 +71,7 @@ export function LeadsCardGrid({
   onDeleteLead,
   onRestoreLead,
 }: LeadsCardGridProps) {
+  const router = useRouter()
   if (leads.length === 0) {
     return (
       <div className="flex h-48 flex-col items-center justify-center gap-2 text-muted-foreground">
@@ -217,12 +221,10 @@ export function LeadsCardGrid({
               {lead.mobile && (
                 <button
                   type="button"
-                  onClick={() =>
-                    window.open(
-                      `https://wa.me/${lead.mobile?.replace(/\D/g, '') || ''}`,
-                      '_blank'
-                    )
-                  }
+                  onClick={() => {
+                    const phone = lead.mobile || '';
+                    router.push(`/inbox?phone=${encodeURIComponent(phone)}&name=${encodeURIComponent(lead.buyer_name || '')}&docType=enquiry&docId=${lead.id}`);
+                  }}
                   className="flex items-center gap-1 h-6 px-2 rounded-md text-[10px] font-semibold text-emerald-500 hover:bg-emerald-500/10 transition-colors"
                 >
                   <MessageSquare className="h-3 w-3" />

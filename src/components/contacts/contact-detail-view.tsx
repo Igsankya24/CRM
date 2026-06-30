@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { formatCurrency } from '@/lib/currency';
@@ -33,6 +34,7 @@ import {
   Save,
   X,
   DollarSign,
+  MessageSquare,
 } from 'lucide-react';
 
 interface ContactDetailViewProps {
@@ -48,6 +50,7 @@ export function ContactDetailView({
   contactId,
   onUpdated,
 }: ContactDetailViewProps) {
+  const router = useRouter();
   const supabase = createClient();
   const { accountId, defaultCurrency } = useAuth();
 
@@ -368,6 +371,16 @@ export function ContactDetailView({
                       ) : (
                         <Copy className="size-3" />
                       )}
+                    </button>
+                    <button
+                      onClick={() => {
+                        router.push(`/inbox?phone=${encodeURIComponent(contact.phone)}&name=${encodeURIComponent(contact.name || '')}&docType=contact&docId=${contact.id}`);
+                      }}
+                      className="flex items-center gap-1 hover:text-emerald-450 text-emerald-500 transition-colors cursor-pointer"
+                      title="Send WhatsApp Message"
+                    >
+                      <MessageSquare className="size-3" />
+                      Message
                     </button>
                     {contact.email && (
                       <span className="flex items-center gap-1">

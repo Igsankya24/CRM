@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import {
@@ -22,6 +23,7 @@ interface FollowupCenterProps {
 type TabType = 'today' | 'missed' | 'upcoming' | 'completed'
 
 export function FollowupCenter({ tasks, onRefresh }: FollowupCenterProps) {
+  const router = useRouter()
   const supabase = createClient()
   const [activeTab, setActiveTab] = useState<TabType>('today')
   const [updatingId, setUpdatingId] = useState<string | null>(null)
@@ -199,7 +201,7 @@ export function FollowupCenter({ tasks, onRefresh }: FollowupCenterProps) {
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => window.open(`https://wa.me/${t.mobile?.replace(/\D/g, '') || ''}`, '_blank')}
+                    onClick={() => router.push(`/inbox?phone=${encodeURIComponent(t.mobile || '')}&name=${encodeURIComponent(t.buyerName || '')}&docType=enquiry&docId=${t.leadId}`)}
                     className="h-7 w-7 p-0 hover:bg-emerald-500/10 text-emerald-500"
                     title="WhatsApp Message"
                   >

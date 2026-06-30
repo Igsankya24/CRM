@@ -102,3 +102,17 @@ export function phoneVariants(sanitized: string): string[] {
 export function isRecipientNotAllowedError(message: string): boolean {
   return /131030|not in allowed list|not in the allowed list/i.test(message)
 }
+
+/**
+ * Normalize phone number to standard E.164 with country code.
+ * Prepend +91 for 10-digit Indian mobile numbers.
+ */
+export function normalizePhoneForCRM(phone: string): string {
+  if (!phone) return '';
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 10) {
+    return '+91' + digits;
+  }
+  return phone.startsWith('+') ? phone : '+' + digits;
+}
+

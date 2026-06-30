@@ -182,6 +182,53 @@ function determineStage(
   return 'collecting_requirements'
 }
 
+// Helper to parse JSON or text block output from the LLM
+function parseAgentResponse(content: string, lastLanguage: string = 'English') {
+  let cleaned = content.trim();
+
+  // Strip markdown code block wrappers if present
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
+  }
+
+  try {
+    const parsed = JSON.parse(cleaned);
+    return {
+      detected_language: parsed.detected_language || lastLanguage,
+      reply: parsed.reply || content,
+      intent: parsed.intent || 'Inquiry',
+      ai_actions: parsed.ai_actions || 'Answering queries',
+      suggested_next_reply: parsed.suggested_next_reply || 'N/A'
+    };
+  } catch (err) {
+    console.warn('[sales-agent] Failed to parse JSON response from LLM:', err);
+    // Robust fallback: try to extract JSON-like substring
+    const startIdx = cleaned.indexOf('{');
+    const endIdx = cleaned.lastIndexOf('}');
+    if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+      try {
+        const parsed = JSON.parse(cleaned.substring(startIdx, endIdx + 1));
+        return {
+          detected_language: parsed.detected_language || lastLanguage,
+          reply: parsed.reply || content,
+          intent: parsed.intent || 'Inquiry',
+          ai_actions: parsed.ai_actions || 'Answering queries',
+          suggested_next_reply: parsed.suggested_next_reply || 'N/A'
+        };
+      } catch (e) {}
+    }
+
+    // Total fallback: assume the entire content is the reply
+    return {
+      detected_language: lastLanguage,
+      reply: content,
+      intent: 'Inquiry',
+      ai_actions: 'Generated text response',
+      suggested_next_reply: 'Analyze conversation and reply'
+    };
+  }
+}
+
 // ─── Main Agent ─────────────────────────────────────────────────────────
 
 /**
@@ -212,15 +259,53 @@ export async function generateSalesReply(
 
   // 2. Load conversation memory
   const convMemory = await getConversationMemory(conversationId)
+  const currentPrefLanguage = convMemory?.preferred_language || 'English'
 
   // 3. Build system prompt
   const basePrompt = conversationOverrides?.systemPrompt
     ?? aiConfig.systemPrompt
     ?? SALES_AGENT_SYSTEM_PROMPT
 
-  const fullSystemPrompt = knowledgeBlock
-    ? `${basePrompt}\n\n---\n\n${knowledgeBlock}`
-    : basePrompt
+  const multilingualInstructions = `
+## Multilingual & Script Style Matching Rules:
+- Detect the customer's language and script style from their message history (particularly the latest message).
+- Reply in the EXACT same language and script style as the customer's message.
+- Supported languages/styles:
+  - English -> Reply in English.
+  - Hindi (Devanagari script, e.g. "नमस्ते") -> Reply in Devanagari Hindi.
+  - Hinglish (Roman Hindi script, e.g. "Mujhe price batao", "Discount milega kya", "Machine kitne ki hai") -> Reply in Roman Hindi (Hinglish).
+  - Marathi (Devanagari script, e.g. "नमस्कार") -> Reply in Devanagari Marathi.
+  - Roman Marathi (e.g. "Machine chi price kay aahe", "Catalogue pathva") -> Reply in Roman Marathi.
+  - Kannada (Kannada script, e.g. "ನಮಸ್ಕಾರ") -> Reply in Kannada script.
+  - Roman Kannada (e.g. "Machine beku", "Price yestu", "Catalogue kalisi") -> Reply in Roman Kannada.
+- Switch languages dynamically mid-conversation if the customer switches. Adapt without resetting the conversation. Remember the preferred language.
+- Do NOT translate product names (e.g. 'Wood Cutting Machine', 'Biomass Dryer', 'Solar Cooker', 'Charcoal Stove' must remain in English).
+- Do NOT translate or modify prices, numbers, phone numbers, website URLs, GST numbers, IFSC codes, bank details, or document numbers (quotations, proformas, sales registers). Keep them exactly as they are in the database.
+- The customer's preferred language/style so far: ${currentPrefLanguage}.
+
+## Classification Rules for "detected_language" property:
+- Output "English" ONLY if the customer's message is written in standard English using Roman letters (e.g. "Hello, what is the price of Wood Cutting Machine?").
+- Output "Hindi" ONLY if the customer's message is written in the Hindi Devanagari script (e.g. "नमस्ते").
+- Output "Hinglish" ONLY if the customer's message is Hindi written using Roman letters / transliterated (e.g. "Mujhe price batao", "Machine kitne ki hai").
+- Output "Marathi" ONLY if the customer's message is written in the Marathi Devanagari script (e.g. "नमस्कार").
+- Output "Roman Marathi" ONLY if the customer's message is Marathi written using Roman letters / transliterated (e.g. "Machine chi price kay aahe").
+- Output "Kannada" ONLY if the customer's message is written in the Kannada script (e.g. "ನಮಸ್ಕಾರ").
+- Output "Roman Kannada" ONLY if the customer's message is Kannada written using Roman letters / transliterated (e.g. "price yestu", "Machine beku").
+- IMPORTANT: A message must be classified as native script "Hindi", "Marathi", or "Kannada" even if it contains English product names (like "Biomass Dryer", "Charcoal Stove") or numbers in Roman script, as long as the verbs, sentence grammar, and greetings are written in the native script (Devanagari or Kannada). Do NOT classify a message as Hinglish/Roman Marathi/Roman Kannada just because of Roman-letter product names or numbers.
+
+## Output Format Requirements:
+You MUST respond ONLY with a JSON object. Do not output anything before or after the JSON object.
+Use this format:
+{
+  "detected_language": "English | Hindi | Marathi | Kannada | Hinglish | Roman Marathi | Roman Kannada",
+  "reply": "Your response to the customer in the matching language/style.",
+  "intent": "Short summary of the customer's intent in English.",
+  "ai_actions": "Short summary of actions you took (e.g. 'Provided Biomass Dryer price') in English.",
+  "suggested_next_reply": "Suggested next action or reply for a human agent in English."
+}
+`;
+
+  const fullSystemPrompt = `${basePrompt}\n\n${multilingualInstructions}${knowledgeBlock ? `\n\n---\n\n${knowledgeBlock}` : ''}`
 
   // 4. Generate AI reply
   const aiResult = await getAIResponse(messages, {
@@ -228,8 +313,11 @@ export async function generateSalesReply(
     systemPrompt: fullSystemPrompt,
     onlyFree: aiConfig.onlyFree,
     openrouterApiKey: aiConfig.openrouterApiKey,
-    maxTokens: 600,
+    maxTokens: 800,
   })
+
+  // Parse structured details from response
+  const parsed = parseAgentResponse(aiResult.content, currentPrefLanguage)
 
   // 5. Extract facts from inbound message
   const extractedFacts = extractFactsFromMessage(inboundText)
@@ -249,6 +337,7 @@ export async function generateSalesReply(
     ai_message_count: (convMemory?.ai_message_count ?? 0) + 1,
     message_count: (convMemory?.message_count ?? 0) + 2,
     last_customer_message_at: new Date().toISOString(),
+    preferred_language: parsed.detected_language,
   }
 
   if (extractedFacts.budget) updatedMemory.budget = extractedFacts.budget
@@ -259,7 +348,14 @@ export async function generateSalesReply(
 
   // Merge extracted_facts
   const existingFacts = convMemory?.extracted_facts ?? {}
-  updatedMemory.extracted_facts = { ...existingFacts, ...extractedFacts }
+  updatedMemory.extracted_facts = {
+    ...existingFacts,
+    ...extractedFacts,
+    detected_language: parsed.detected_language,
+    intent: parsed.intent,
+    ai_actions: parsed.ai_actions,
+    suggested_next_reply: parsed.suggested_next_reply,
+  }
 
   // Set first_response_at if this is the first exchange
   if (!convMemory?.first_response_at) {
@@ -290,11 +386,11 @@ export async function generateSalesReply(
   }
 
   return {
-    reply: aiResult.content,
+    reply: parsed.reply,
     model: aiResult.model,
     shouldHandoff: handoff.shouldHandoff,
     handoffReason: handoff.reason,
     leadScore,
-    extractedFacts,
+    extractedFacts: updatedMemory.extracted_facts as Record<string, string>,
   }
 }

@@ -13,6 +13,7 @@ import { TAX_OPTIONS, getTaxRate } from "@/lib/quotation-utils";
 import type { Proforma, ProformaStatus } from "@/types";
 import { DocumentRelationshipWidget } from "@/components/crm/document-relationship-widget";
 import { usePermissions } from "@/hooks/use-permissions";
+import { isValidUUID } from "@/lib/utils";
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -116,7 +117,14 @@ export default function ViewProformaPage() {
     }
   };
 
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => {
+    if (!isValidUUID(id)) {
+      setLoading(false);
+      setProforma(null);
+      return;
+    }
+    load();
+  }, [id]);
 
   const [converting, setConverting] = useState(false);
   const { hasPermission } = usePermissions();
@@ -154,7 +162,23 @@ export default function ViewProformaPage() {
     );
   }
 
-  if (!proforma) return null;
+  if (!proforma) {
+    return (
+      <div className="flex min-h-[50vh] flex-col items-center justify-center text-center p-6 bg-slate-900 border border-slate-800 rounded-xl my-8 max-w-2xl mx-auto w-full select-none">
+        <h2 className="text-xl font-semibold text-white mb-2">No Proforma Found</h2>
+        <p className="text-sm text-slate-400 mb-6 max-w-md">
+          The requested proforma could not be loaded. It may have been deleted, or the URL may be invalid.
+        </p>
+        <Link
+          href="/proformas"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Proforma Register
+        </Link>
+      </div>
+    );
+  }
 
   const items = proforma.items ?? [];
   const cd = proforma.company_details;

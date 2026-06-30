@@ -59,7 +59,7 @@ export async function GET() {
     return NextResponse.json({
       config: {
         id: config.id,
-        ai_enabled: config.ai_enabled ?? false,
+        ai_enabled: config.ai_enabled ?? true,
         ai_only_free_models: config.ai_only_free_models ?? true,
         ai_model: config.ai_model ?? 'google/gemini-2.5-flash:free',
         ai_system_prompt: config.ai_system_prompt ?? '',

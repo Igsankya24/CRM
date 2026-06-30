@@ -90,12 +90,156 @@ const EMOJI_CATEGORIES = [
   }
 ];
 
-const QUICK_REPLIES = [
-  { label: "Greeting", text: "Hello! Welcome to Phoenix Products. How can we help you today?" },
-  { label: "Follow-up", text: "Hi! Just following up on our previous conversation. Let us know if you have any questions." },
-  { label: "Payment Details", text: "Please find our bank details below:\nBank: HDFC Bank\nAccount Name: Phoenix Products\nAccount No: 1234567890\nIFSC: HDFC0001234" },
-  { label: "Thank You", text: "Thank you for contacting Phoenix Products. We appreciate your business!" },
-];
+const TRANSLATED_SUGGESTIONS: Record<string, Record<string, string[]>> = {
+  INDIAMART: {
+    English: [
+      "We received your inquiry via IndiaMART. May we know your required quantity?",
+      "I'm sending the requested product brochure. Let us know if you need a quote.",
+      "Can we connect for a quick 5-minute call to discuss your specifications?"
+    ],
+    Hindi: [
+      "हमें इंडियामार्ट के माध्यम से आपका अनुरोध प्राप्त हुआ है। क्या हम आपकी आवश्यक मात्रा जान सकते हैं?",
+      "मैं अनुरोधित उत्पाद विवरणिका भेज रहा हूँ। यदि आपको कोटेशन की आवश्यकता हो तो हमें बताएं।",
+      "क्या हम आपकी विशिष्टताओं पर चर्चा करने के लिए 5 मिनट की त्वरित कॉल पर जुड़ सकते हैं?"
+    ],
+    Hinglish: [
+      "Humein IndiaMART ke zariye aapka inquiry mila hai. Kya hum aapki required quantity jaan sakte hain?",
+      "Main requested product brochure bhej raha hoon. Agar aapko quotation chahiye toh bataiye.",
+      "Kya hum specs discuss karne ke liye ek quick 5-minute call pe connect kar sakte hain?"
+    ],
+    Marathi: [
+      "आम्हाला इंडियामार्ट द्वारे तुमची विचारणा मिळाली आहे. आम्हाला तुमची आवश्यक प्रमाण कळू शकेल का?",
+      "मी विनंती केलेले उत्पादन माहितीपत्रक पाठवत आहे. तुम्हाला कोटेशन हवे असल्यास आम्हाला सांगा.",
+      "तुमच्या गरजेनुसार चर्चा करण्यासाठी आपण ५ मिनिटांच्या कॉलवर बोलू शकतो का?"
+    ],
+    "Roman Marathi": [
+      "Amhala IndiaMART kadun tumchi enquiry bhetli ahe. Tumhala kiti quantity pahije sangu shakta ka?",
+      "Mi product brochure pathvat ahe. Quotation lagnar asel tar nakki sanga.",
+      "Garajenusar charcha karnyasathi apan ek quick 5-minute call var boluya ka?"
+    ],
+    Kannada: [
+      "ನಮಗೆ ಇಂಡಿಯಾಮಾರ್ಟ್ ಮೂಲಕ ನಿಮ್ಮ ವಿಚಾರಣೆ ಬಂದಿದೆ. ನಿಮ್ಮ ಪ್ರಮಾಣ ಎಷ್ಟು ಬೇಕು ಎಂದು ತಿಳಿಸಬಹುದೇ?",
+      "ನಾನು ಉತ್ಪನ್ನದ ಬ್ರೋಷರ್ ಕಳುಹಿಸುತ್ತಿದ್ದೇನೆ. ನಿಮಗೆ ಕೊಟೇಶನ್ ಬೇಕಾದರೆ ದಯವಿಟ್ಟು ತಿಳಿಸಿ.",
+      "ನಿಮ್ಮ ಅಗತ್ಯಗಳ ಬಗ್ಗೆ ಮಾತನಾಡಲು ನಾವು 5 ನಿಮಿಷಗಳ ಕಾಲ ಫೋನ್ ಕರೆಯಲ್ಲಿ ಮಾತನಾಡಬಹುದೇ?"
+    ],
+    "Roman Kannada": [
+      "Namage IndiaMART inda nimma enquiry bandide. Nimage yestu quantity beku anta helabahude?",
+      "Nanu product brochure kalusuttiddene. Quotation beku adre namma jothe heli.",
+      "Nimma specs bagge mathadalu navu fast agi 5-minute call nalli connect agabahude?"
+    ]
+  },
+  TRADEINDIA: {
+    English: [
+      "Thanks for reaching out on TradeIndia! What is your delivery location?",
+      "Sure, I will share the price list and catalogs shortly.",
+      "Would you like us to schedule a callback with our product experts?"
+    ],
+    Hindi: [
+      "ट्रेडइंडिया पर हमसे संपर्क करने के लिए धन्यवाद! आपका डिलीवरी स्थान क्या है?",
+      "ज़रूर, मैं जल्द ही मूल्य सूची और कैटलॉग साझा करूँगा।",
+      "क्या आप चाहेंगे कि हम अपने उत्पाद विशेषज्ञों के साथ एक कॉल शेड्यूल करें?"
+    ],
+    Hinglish: [
+      "TradeIndia par reach out karne ke liye thanks! Aapka delivery location kya hai?",
+      "Sure, main price list aur catalogs jaldi hi share karunga.",
+      "Kya aap chahenge ki hum apne product experts ke saath ek callback schedule karein?"
+    ],
+    Marathi: [
+      "ट्रेडइंडियावर संपर्क साधल्याबद्दल धन्यवाद! तुमचे डिलिव्हरीचे ठिकाण काय आहे?",
+      "नक्कीच, मी लवकरच किंमत सूची आणि कॅटलॉग सामायिक करेन.",
+      "तुम्हाला आमच्या उत्पादन तज्ञांसोबत कॉल शेड्यूल करायला आवडेल का?"
+    ],
+    "Roman Marathi": [
+      "TradeIndia var contact kelyabaddal thanks! Tumche delivery location konte ahe?",
+      "Nakkich, mi lavkarach price list ani catalogue share karto.",
+      "Tumhi amchya product expert sobat bolnyasathi callback schedule karu ichhita ka?"
+    ],
+    Kannada: [
+      "ಟ್ರೇಡ್‌ಇಂಡಿಯಾದಲ್ಲಿ ಸಂಪರ್ಕಿಸಿದ್ದಕ್ಕಾಗಿ ಧನ್ಯವಾದಗಳು! ನಿಮ್ಮ ವಿತರಣಾ ಸ್ಥಳ ಯಾವುದು?",
+      "ಖಂಡಿತ, ನಾನು ಶೀಘ್ರದಲ್ಲೇ ಬೆಲೆ ಪಟ್ಟಿ ಮತ್ತು ಕ್ಯಾಟಲಾಗ್‌ಗಳನ್ನು ಹಂಚಿಕೊಳ್ಳುತ್ತೇನೆ.",
+      "ನಮ್ಮ ಉತ್ಪನ್ನ ತಜ್ಞರೊಂದಿಗೆ ಫೋನ್ ಕರೆಯನ್ನು ನಿಗದಿಪಡಿಸಲು ನೀವು ಬಯಸುವಿರಾ?"
+    ],
+    "Roman Kannada": [
+      "TradeIndia dalli contact madiddakke dhanyavadagalu! Nimma delivery location yavudu?",
+      "Khanditha, nanu price list mattu catalogue kalusuttene.",
+      "Namma product experts jothe callback schedule madalu nimage istavideya?"
+    ]
+  },
+  EXPORTERSINDIA: {
+    English: [
+      "Thank you for contacting us on ExportersIndia. What is your timeline?",
+      "Yes, we support bulk exports. Let me send our global export catalog.",
+      "Could you share your direct WhatsApp number or email address?"
+    ],
+    Hindi: [
+      "एक्सपोर्टर्सइंडिया पर हमसे संपर्क करने के लिए धन्यवाद। आपकी समयसीमा क्या है?",
+      "हाँ, हम थोक निर्यात का समर्थन करते हैं। मुझे अपना वैश्विक निर्यात कैटलॉग भेजने दें।",
+      "क्या आप अपना सीधा व्हाट्सएप नंबर या ईमेल पता साझा कर सकते हैं?"
+    ],
+    Hinglish: [
+      "ExportersIndia par humse contact karne ke liye thanks. Aapki timeline kya hai?",
+      "Haan, hum bulk exports support karte hain. Main hamara global export catalog bhejta hoon.",
+      "Kya aap apna direct WhatsApp number ya email address share kar sakte hain?"
+    ],
+    Marathi: [
+      "एक्सपोर्टर्सइंडियावर आमच्याशी संपर्क साधल्याबद्दल धन्यवाद. तुमची वेळमर्यादा काय आहे?",
+      "होय, आम्ही घाऊक निर्यातीला पाठिंबा देतो. मला आमचे जागतिक निर्यात कॅटलॉग पाठवू द्या.",
+      "तुम्ही तुमचा थेट व्हॉट्सॲप नंबर किंवा ईमेल पत्ता शेअर करू शकता का?"
+    ],
+    "Roman Marathi": [
+      "ExportersIndia var contact kelyabaddal thanks. Tumche timeline kay ahe?",
+      "Hoy, amhi bulk export support karto. Mi amcha global export catalogue pathvato.",
+      "Tumhi tumcha direct WhatsApp number kinva email share karu shakto ka?"
+    ],
+    Kannada: [
+      "ಎಕ್ಸ್‌ಪೋರ್ಟರ್ಸ್‌ಇಂಡಿಯಾದಲ್ಲಿ ನಮ್ಮನ್ನು ಸಂಪರ್ಕಿಸಿದ್ದಕ್ಕಾಗಿ ಧನ್ಯವಾದಗಳು. ನಿಮ್ಮ ಸಮಯದ ಮಿತಿ ಏನು?",
+      "ಹೌದು, ನಾವು ಸಗಟು ರಫ್ತುಗಳನ್ನು ಬೆಂಬಲಿಸುತ್ತೇವೆ. ನಮ್ಮ ಜಾಗತಿಕ ರಫ್ತು ಕ್ಯಾಟಲಾಗ್ ಕಳುಹಿಸಲು ನನಗೆ ಅನುಮतಿಸಿ.",
+      "ನಿಮ್ಮ ನೇರ ವಾಟ್ಸಾಪ್ ಸಂಖ್ಯೆ ಅಥವಾ ಇಮೇಲ್ ವಿಳಾಸವನ್ನು ಹಂಚಿಕೊಳ್ಳಬಹುದೇ?"
+    ],
+    "Roman Kannada": [
+      "ExportersIndia dalli contact madiddakke dhanyavadagalu. Nimma timeline yavudu?",
+      "Houdu, navu bulk export support maduttene. Nanu global export catalogue kalusuttene.",
+      "Nimma direct WhatsApp number athava email address share madabahude?"
+    ]
+  },
+  OTHER: {
+    English: [
+      "Hello! Sure, I will send the catalog details right away.",
+      "Could you please share your email address for sending the proposal?",
+      "I have scheduled a follow-up call. We'll speak soon."
+    ],
+    Hindi: [
+      "नमस्ते! ज़रूर, मैं तुरंत कैटलॉग विवरण भेज दूँगा।",
+      "प्रस्ताव भेजने के लिए क्या आप कृपया अपना ईमेल पता साझा कर सकते हैं?",
+      "मैंने एक अनुवर्ती कॉल शेड्यूल की है। हम जल्द ही बात करेंगे।"
+    ],
+    Hinglish: [
+      "Hello! Sure, main catalog details abhi bhej deta hoon.",
+      "Proposal bhejne ke liye kya aap please apna email address share करेंगे?",
+      "Maine ek follow-up call schedule kiya hai. Hum jaldi baat karenge."
+    ],
+    Marathi: [
+      "नमस्कार! नक्कीच, मी ताबडतोब कॅटलॉग तपशील पाठवीन.",
+      "प्रस्ताव पाठवण्यासाठी तुम्ही कृपया तुमचा ईमेल पत्ता शेअर करू शकता का?",
+      "मी फॉलो-अप कॉल शेड्यूल केला आहे. आपण लवकरच बोलू."
+    ],
+    "Roman Marathi": [
+      "Hello! Nakkich, mi catalogue details lagech pathvato.",
+      "Proposal pathvnyasathi tumhi tumcha email address share karu shakto ka?",
+      "Mi ek follow-up call schedule kela ahe. Apan lavkarach bolu."
+    ],
+    Kannada: [
+      "ನಮಸ್ಕಾರ! ಖಂಡಿತ, ನಾನು ಕ್ಯಾಟಲಾಗ್ ವಿವರಗಳನ್ನು ತಕ್ಷಣವೇ ಕಳುಹಿಸುತ್ತೇನೆ.",
+      "ಪ್ರಸ್ತಾವನೆಯನ್ನು ಕಳುಹಿಸಲು ದಯವಿಟ್ಟು ನಿಮ್ಮ ಇಮೇಲ್ ವಿಳಾಸವನ್ನು ಹಂಚಿಕೊಳ್ಳಬಹುದೇ?",
+      "ನಾನು ಫಾಲೋ-ಅಪ್ ಕರೆಯನ್ನು ನಿಗದಿಪಡಿಸಿದ್ದೇನೆ. ನಾವು ಶೀಘ್ರದಲ್ಲೇ ಮಾತನಾಡುತ್ತೇವೆ."
+    ],
+    "Roman Kannada": [
+      "Hello! Sure, nanu catalogue details thakshana kalusuttene.",
+      "Proposal kalusuttadakke dayavittu nimma email address share madabahude?",
+      "Nanu ondu follow-up call schedule madiddene. Navu bega mathadonu."
+    ]
+  }
+};
 
 export function MessageComposer({
   conversationId,
@@ -111,6 +255,7 @@ export function MessageComposer({
   const [sending, setSending] = useState(false);
   const [activeEmojiTab, setActiveEmojiTab] = useState("Smileys");
   const [attachment, setAttachment] = useState<SelectedAttachment | null>(null);
+  const [defaultBank, setDefaultBank] = useState<any | null>(null);
 
   const [generatingPrefillPdf, setGeneratingPrefillPdf] = useState(false);
   const [latestDocs, setLatestDocs] = useState<{
@@ -119,7 +264,7 @@ export function MessageComposer({
     sales: { id: string; no: string } | null;
   }>({ quotation: null, proforma: null, sales: null });
 
-  // Fetch latest documents for the active conversation's contact
+  // Fetch latest documents & default bank details for the active conversation
   useEffect(() => {
     if (!conversationId) return;
     const supabase = createClient();
@@ -132,37 +277,49 @@ export function MessageComposer({
           .eq("id", conversationId)
           .maybeSingle();
 
+        if (conv?.account_id) {
+          const { data: bankAccounts } = await supabase
+            .from("company_bank_accounts")
+            .select("*")
+            .eq("account_id", conv.account_id);
+
+          const defaultAcc = bankAccounts?.find(b => b.is_default) || bankAccounts?.[0] || null;
+          setDefaultBank(defaultAcc);
+        } else {
+          setDefaultBank(null);
+        }
+
         const phone = conv?.contact?.phone;
-        if (!phone) return;
+        if (phone) {
+          const { data: quots } = await supabase
+            .from("quotations")
+            .select("id, quotation_no")
+            .eq("mobile", phone)
+            .order("created_at", { ascending: false })
+            .limit(1);
 
-        const { data: quots } = await supabase
-          .from("quotations")
-          .select("id, quotation_no")
-          .eq("mobile", phone)
-          .order("created_at", { ascending: false })
-          .limit(1);
+          const { data: profs } = await supabase
+            .from("proformas")
+            .select("id, proforma_no")
+            .eq("mobile", phone)
+            .order("created_at", { ascending: false })
+            .limit(1);
 
-        const { data: profs } = await supabase
-          .from("proformas")
-          .select("id, proforma_no")
-          .eq("mobile", phone)
-          .order("created_at", { ascending: false })
-          .limit(1);
+          const { data: salesRegs } = await supabase
+            .from("sales_registers")
+            .select("id, sales_register_no")
+            .eq("mobile", phone)
+            .order("created_at", { ascending: false })
+            .limit(1);
 
-        const { data: salesRegs } = await supabase
-          .from("sales_registers")
-          .select("id, sales_register_no")
-          .eq("mobile", phone)
-          .order("created_at", { ascending: false })
-          .limit(1);
-
-        setLatestDocs({
-          quotation: quots?.[0] ? { id: quots[0].id, no: quots[0].quotation_no } : null,
-          proforma: profs?.[0] ? { id: profs[0].id, no: profs[0].proforma_no } : null,
-          sales: salesRegs?.[0] ? { id: salesRegs[0].id, no: salesRegs[0].sales_register_no } : null,
-        });
+          setLatestDocs({
+            quotation: quots?.[0] ? { id: quots[0].id, no: quots[0].quotation_no } : null,
+            proforma: profs?.[0] ? { id: profs[0].id, no: profs[0].proforma_no } : null,
+            sales: salesRegs?.[0] ? { id: salesRegs[0].id, no: salesRegs[0].sales_register_no } : null,
+          });
+        }
       } catch (err) {
-        console.error("Failed to load customer latest documents:", err);
+        console.error("Failed to load customer latest documents and bank details:", err);
       }
     })();
   }, [conversationId]);
@@ -315,6 +472,15 @@ export function MessageComposer({
     }
   }, [prefillContext, generatePrefilledPdf]);
 
+  // Autofocus input on conversation switch
+  useEffect(() => {
+    if (conversationId && textareaRef.current) {
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 100);
+    }
+  }, [conversationId]);
+
   const [generatingAiReply, setGeneratingAiReply] = useState(false);
 
   const handleGenerateAiReply = async () => {
@@ -389,31 +555,20 @@ export function MessageComposer({
         const platform = Array.isArray(leadData)
           ? (leadData[0] as { platform: string } | undefined)?.platform
           : (leadData as unknown as { platform: string } | null)?.platform;
-        if (platform === "INDIAMART") {
-          setAiSuggestions([
-            "We received your inquiry via IndiaMART. May we know your required quantity?",
-            "I'm sending the requested product brochure. Let us know if you need a quote.",
-            "Can we connect for a quick 5-minute call to discuss your specifications?"
-          ]);
-        } else if (platform === "TRADEINDIA") {
-          setAiSuggestions([
-            "Thanks for reaching out on TradeIndia! What is your delivery location?",
-            "Sure, I will share the price list and catalogs shortly.",
-            "Would you like us to schedule a callback with our product experts?"
-          ]);
-        } else if (platform === "EXPORTERSINDIA") {
-          setAiSuggestions([
-            "Thank you for contacting us on ExportersIndia. What is your timeline?",
-            "Yes, we support bulk exports. Let me send our global export catalog.",
-            "Could you share your direct WhatsApp number or email address?"
-          ]);
-        } else {
-          setAiSuggestions([
-            "Hello! Sure, I will send the catalog details right away.",
-            "Could you please share your email address for sending the proposal?",
-            "I have scheduled a follow-up call. We'll speak soon."
-          ]);
-        }
+
+        // Resolve preferred language from ai_conversation_memory
+        const { data: convMem } = await supabase
+          .from("ai_conversation_memory")
+          .select("preferred_language")
+          .eq("conversation_id", conversationId)
+          .maybeSingle();
+
+        const preferredLanguage = convMem?.preferred_language || "English";
+        const pf = (platform === "INDIAMART" || platform === "TRADEINDIA" || platform === "EXPORTERSINDIA") ? platform : "OTHER";
+        const langKey = TRANSLATED_SUGGESTIONS[pf][preferredLanguage] ? preferredLanguage : "English";
+        const suggestions = TRANSLATED_SUGGESTIONS[pf][langKey] || TRANSLATED_SUGGESTIONS[pf]["English"];
+
+        setAiSuggestions(suggestions);
       } catch (err) {
         console.error(err);
       } finally {
@@ -571,6 +726,18 @@ export function MessageComposer({
     return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
   };
 
+  const dynamicQuickReplies = [
+    { label: "Greeting", text: "Hello! Welcome to Phoenix Products. How can we help you today?" },
+    { label: "Follow-up", text: "Hi! Just following up on our previous conversation. Let us know if you have any questions." },
+    {
+      label: "Payment Details",
+      text: defaultBank
+        ? `Please find our bank details:\n\nBank Name:\n${defaultBank.bank_name || ""}\n\nBranch:\n${defaultBank.branch_name || ""}\n\nAccount Name:\n${defaultBank.account_name || ""}\n\nAccount Number:\n${defaultBank.account_number || ""}\n\nAccount Type:\n${defaultBank.account_type || ""}\n\nIFSC Code:\n${defaultBank.bank_ifsc || ""}\n\nUPI:\n${defaultBank.upi_id || ""}\n\nThank you.`
+        : "Please configure bank details in Settings > Company Profile > Bank Details."
+    },
+    { label: "Thank You", text: "Thank you for contacting Phoenix Products. We appreciate your business!" },
+  ];
+
   return (
     <div className="border-t border-slate-800 bg-slate-900 p-3 select-none flex flex-col gap-2 shrink-0">
       {/* Hidden input file tag */}
@@ -604,7 +771,7 @@ export function MessageComposer({
               Quick Replies
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" side="top" className="border-slate-700 bg-slate-800 text-slate-200 w-56 max-h-64 overflow-y-auto">
-              {QUICK_REPLIES.map((qr) => (
+              {dynamicQuickReplies.map((qr) => (
                 <DropdownMenuItem
                   key={qr.label}
                   onClick={() => {
@@ -949,6 +1116,7 @@ export function MessageComposer({
           /* NORMAL INPUT AREA WITH TEXTAREA */
           <div className="flex-1 relative">
             <textarea
+              id="message-textarea"
               ref={textareaRef}
               value={text}
               onChange={handleChange}

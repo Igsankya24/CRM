@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
+import { isValidUUID } from "@/lib/utils";
 
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -106,6 +107,11 @@ export default function FlowRunsPage() {
 
   useEffect(() => {
     if (!params.id) return;
+    if (!isValidUUID(params.id)) {
+      setNotFound(true);
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
@@ -157,14 +163,17 @@ export default function FlowRunsPage() {
   }
   if (notFound || !flow) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3">
-        <p className="text-sm text-slate-400">Flow not found.</p>
+      <div className="flex min-h-[50vh] flex-col items-center justify-center text-center p-6 bg-slate-900 border border-slate-800 rounded-xl my-8 max-w-2xl mx-auto w-full select-none">
+        <h2 className="text-xl font-semibold text-white mb-2">Flow Runs Not Found</h2>
+        <p className="text-sm text-slate-400 mb-6 max-w-md">
+          The requested flow execution logs could not be loaded. It may have been deleted, or the URL may be invalid.
+        </p>
         <button
           type="button"
           onClick={() => router.push("/flows")}
-          className="text-sm text-primary hover:opacity-80"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 transition-colors"
         >
-          ← Back to flows
+          Back to Flows
         </button>
       </div>
     );

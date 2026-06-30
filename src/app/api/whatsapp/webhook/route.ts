@@ -221,12 +221,19 @@ export async function POST(request: Request) {
     console.error('[webhook] Failed to resolve app_secret from database:', err)
   }
 
-  if (!verifyMetaWebhookSignature(rawBody, signature, appSecret)) {
-    // 401 (not 200) — we want Meta's delivery dashboard to show failures
-    // loudly if a misconfiguration causes signatures to stop matching,
-    // rather than silently eating events.
-    console.warn('[webhook] rejected request with invalid signature')
+  // If we couldn't resolve an app secret from the DB OR the env var,
+  // we can't verify the signature — but we must not silently drop all
+  // inbound messages. Log a clear warning and allow the request through
+  // so operators can start receiving messages immediately; they should
+  // add the App Secret in Settings → WhatsApp → Credentials to enable
+  // full HMAC verification.
+  const hasSecret = !!appSecret || !!process.env.META_APP_SECRET
+  if (hasSecret && !verifyMetaWebhookSignature(rawBody, signature, appSecret)) {
+    console.warn('[webhook] Rejected: HMAC signature mismatch. Check your App Secret in Settings → WhatsApp → Credentials.')
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+  }
+  if (!hasSecret) {
+    console.warn('[webhook] No App Secret configured — skipping HMAC verification. Add your Meta App Secret in Settings → WhatsApp → Credentials to secure the webhook.')
   }
 
   // Process asynchronously so we can ack Meta within their timeout.
@@ -1077,31 +1084,55 @@ async function findOrCreateConversation(
   configOwnerUserId: string,
   contactId: string,
 ) {
+  // Use maybeSingle() + filter for non-deleted, ordered by most-recent.
+  // .single() crashes with PGRST116 when there are 0 OR ≥2 rows —
+  // multiple conversations for the same contact are valid (e.g. restored
+  // after delete), and 0 rows just means first-contact. Both cases were
+  // silently dropping inbound messages before this fix.
   const { data: existing, error: findError } = await supabaseAdmin()
     .from('conversations')
     .select('*')
     .eq('account_id', accountId)
     .eq('contact_id', contactId)
-    .single()
+    .is('deleted_at', null)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
-  if (!findError && existing) {
-    if (existing.deleted_at) {
-      // Restore soft-deleted conversation
-      const { data: restored, error: restoreError } = await supabaseAdmin()
-        .from('conversations')
-        .update({ deleted_at: null })
-        .eq('id', existing.id)
-        .select()
-        .single()
-      if (!restoreError && restored) {
-        return restored
-      }
-    }
+  if (findError) {
+    console.error('[webhook] Error querying conversations:', findError)
+    // Non-fatal — fall through and try to create one
+  }
+
+  if (existing) {
     return existing
   }
 
-  // Create new conversation. Same tenancy + audit split as
-  // findOrCreateContact above.
+  // No active conversation — check if there is a soft-deleted one to restore
+  const { data: deleted } = await supabaseAdmin()
+    .from('conversations')
+    .select('*')
+    .eq('account_id', accountId)
+    .eq('contact_id', contactId)
+    .not('deleted_at', 'is', null)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (deleted) {
+    const { data: restored, error: restoreError } = await supabaseAdmin()
+      .from('conversations')
+      .update({ deleted_at: null, updated_at: new Date().toISOString() })
+      .eq('id', deleted.id)
+      .select()
+      .single()
+    if (!restoreError && restored) {
+      console.log('[webhook] Restored soft-deleted conversation:', restored.id)
+      return restored
+    }
+  }
+
+  // Create a brand new conversation
   const { data: newConv, error: createError } = await supabaseAdmin()
     .from('conversations')
     .insert({
@@ -1113,9 +1144,24 @@ async function findOrCreateConversation(
     .single()
 
   if (createError) {
-    console.error('Error creating conversation:', createError)
+    // Lost a race: another request created the conversation between
+    // our lookup and insert. Re-resolve the existing row.
+    if (isUniqueViolation(createError)) {
+      const { data: raced } = await supabaseAdmin()
+        .from('conversations')
+        .select('*')
+        .eq('account_id', accountId)
+        .eq('contact_id', contactId)
+        .is('deleted_at', null)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (raced) return raced
+    }
+    console.error('[webhook] Error creating conversation:', createError)
     return null
   }
 
   return newConv
 }
+

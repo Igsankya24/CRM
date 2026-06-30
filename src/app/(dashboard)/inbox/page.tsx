@@ -11,6 +11,9 @@ import { ContactSidebar } from "@/components/inbox/contact-sidebar";
 import { toast } from "sonner";
 import { WifiOff, X, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { findExistingContact } from "@/lib/contacts/dedupe";
+import { normalizePhoneForCRM } from "@/lib/whatsapp/phone-utils";
+
 
 
 export default function InboxPage() {
@@ -39,6 +42,8 @@ export default function InboxPage() {
   );
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  /** Controls the slide-in contact details panel on the right */
+  const [showContactPanel, setShowContactPanel] = useState(false);
   /**
    * Bumped whenever we want children (ConversationList, MessageThread)
    * to refetch from the DB — used as a safety net against missed
@@ -74,6 +79,7 @@ export default function InboxPage() {
     setActiveConversation(null);
     setActiveContact(null);
     setMessages([]);
+    setShowContactPanel(false);
     autoSelectedForDeepLinkRef.current = null;
     router.replace("/inbox", { scroll: false });
   }, [router]);
@@ -149,27 +155,22 @@ export default function InboxPage() {
       const accountId = profile?.account_id;
       if (!accountId) return;
 
-      // Clean/Normalize the phone number for search
-      const cleanPhone = phoneParam.replace(/[^0-9+]/g, "");
+      // Normalize phone number
+      const normalizedPhoneInput = normalizePhoneForCRM(phoneParam);
+      if (!normalizedPhoneInput) return;
 
-      // 1. Find or create contact
+      // 1. Find or create contact using deduplication helper
       let contact: Contact | null = null;
-      const { data: existingContacts } = await supabase
-        .from("contacts")
-        .select("*")
-        .eq("account_id", accountId)
-        .or(`phone.eq.${cleanPhone},phone.eq.${cleanPhone.replace("+", "")},phone.eq.+${cleanPhone}`);
+      contact = await findExistingContact(supabase, accountId, normalizedPhoneInput) as Contact | null;
 
-      if (existingContacts && existingContacts.length > 0) {
-        contact = existingContacts[0] as Contact;
-      } else {
+      if (!contact) {
         // Create new contact
         const { data: newContact, error: createContactErr } = await supabase
           .from("contacts")
           .insert({
             account_id: accountId,
             user_id: user.id,
-            phone: cleanPhone,
+            phone: normalizedPhoneInput,
             name: nameParam || "New Customer",
             company: docTypeParam ? `${docTypeParam.toUpperCase()} Customer` : "Customer"
           })
@@ -218,6 +219,36 @@ export default function InboxPage() {
         } : null,
       };
 
+      // Fetch whatsapp config to get default AI behavior
+      const { data: config } = await supabase
+        .from("whatsapp_config")
+        .select("status, ai_enabled")
+        .eq("account_id", accountId)
+        .maybeSingle();
+
+      // Find related CRM Lead for assigned user and linking
+      let relatedCrmLead: any = null;
+      if (docTypeParam === "enquiry" && docIdParam) {
+        const { data: leadById } = await supabase
+          .from("crm_leads")
+          .select("*, b2b_leads(*)")
+          .or(`id.eq.${docIdParam},b2b_lead_id.eq.${docIdParam}`)
+          .maybeSingle();
+        relatedCrmLead = leadById;
+      }
+      
+      if (!relatedCrmLead && contact) {
+        const { data: leadByContact } = await supabase
+          .from("crm_leads")
+          .select("*, b2b_leads(*)")
+          .or(`contact_id.eq.${contact.id},phone.eq.${contact.phone}`)
+          .is("deleted_at", null)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        relatedCrmLead = leadByContact;
+      }
+
       if (existingConvs && existingConvs.length > 0) {
         conversation = existingConvs[0] as Conversation;
         // Update the conversation's active document context in database
@@ -239,6 +270,8 @@ export default function InboxPage() {
             user_id: user.id,
             contact_id: contact.id,
             status: "open",
+            ai_mode: config?.ai_enabled ?? false,
+            assigned_agent_id: relatedCrmLead?.assigned_to || null,
             ...docUpdate,
           })
           .select()
@@ -256,6 +289,33 @@ export default function InboxPage() {
       }
 
       if (conversation) {
+        // Update CRM Lead linking if available
+        if (relatedCrmLead) {
+          await supabase
+            .from("crm_leads")
+            .update({ conversation_id: conversation.id })
+            .eq("id", relatedCrmLead.id);
+
+          if (relatedCrmLead.b2b_lead_id) {
+            const { data: existingLC } = await supabase
+              .from("lead_conversations")
+              .select("id")
+              .eq("lead_id", relatedCrmLead.b2b_lead_id)
+              .eq("conversation_id", conversation.id)
+              .maybeSingle();
+              
+            if (!existingLC) {
+              await supabase
+                .from("lead_conversations")
+                .insert({
+                  account_id: accountId,
+                  lead_id: relatedCrmLead.b2b_lead_id,
+                  conversation_id: conversation.id
+                });
+            }
+          }
+        }
+
         // Set prefill text state
         if (prefillText) {
           (conversation as any).prefillContext = {
@@ -585,13 +645,21 @@ export default function InboxPage() {
   const hasActiveConv = !!activeConversation;
   const showBanner = whatsappConnected === false && !bannerDismissed;
 
+  const handleOpenContactPanel = useCallback(() => {
+    setShowContactPanel(true);
+  }, []);
+
+  const handleCloseContactPanel = useCallback(() => {
+    setShowContactPanel(false);
+  }, []);
+
   return (
     // Root: full height, WhatsApp dark background, flex column
     <div
       className="-m-4 flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden sm:-m-6"
       style={{ background: "#0B141A" }}
     >
-      {/* ── Compact WhatsApp connection banner (BUG 6) ── */}
+      {/* ── Compact WhatsApp connection banner ── */}
       {showBanner && (
         <div
           className="flex h-10 shrink-0 items-center justify-between gap-2 px-4"
@@ -622,30 +690,25 @@ export default function InboxPage() {
         </div>
       )}
 
-      {/* ── 3-Panel Grid Layout (BUG 1, 3, 9, 11) ── */}
       {/*
-        Desktop (lg+):  320px | 1fr | 360px
-        Tablet  (md–lg): 320px | 1fr  (right panel hidden)
-        Mobile  (<md):   1 column — list OR thread (sliding)
+        ── 2-Panel Grid Layout ──
+        Desktop (md+):  350px sidebar | remaining chat area
+        Mobile (<md):   1 column — list OR thread (sliding)
+        Contact details panel is a right-edge overlay, hidden by default,
+        slides in when avatar/name is clicked.
       */}
       <div
         className={cn(
           "flex-1 overflow-hidden",
-          // Mobile: flex column, show list or thread
           "flex flex-col",
-          // Desktop: CSS grid with fixed sidebar widths
-          "lg:grid lg:grid-cols-[320px_minmax(0,1fr)_360px]",
-          // Tablet: 2-column grid, right panel hidden via conditional render
-          "md:grid md:grid-cols-[320px_minmax(0,1fr)] lg:grid-cols-[320px_minmax(0,1fr)_360px]",
+          "md:grid md:grid-cols-[350px_minmax(0,1fr)]",
         )}
         style={{ background: "#0B141A" }}
       >
         {/* ── LEFT: Conversation List ── */}
-        {/* Mobile: hidden when a conversation is selected */}
         <div
           className={cn(
             "h-full overflow-hidden",
-            // Mobile single-column behavior
             hasActiveConv ? "hidden md:block" : "flex flex-col flex-1 md:block",
           )}
           style={{ background: "#111B21", borderRight: "1px solid #2A3942" }}
@@ -660,12 +723,11 @@ export default function InboxPage() {
           />
         </div>
 
-        {/* ── CENTER: Message Thread ── */}
-        {/* `min-w-0` is load-bearing: prevents wide content blowing out the grid cell */}
+        {/* ── CENTER: Message Thread (takes all remaining width) ── */}
+        {/* `min-w-0` prevents wide content blowing out the grid cell */}
         <div
           className={cn(
-            "h-full min-w-0 overflow-hidden",
-            // Mobile: show only when a conversation is active
+            "relative h-full min-w-0 overflow-hidden",
             hasActiveConv ? "flex flex-col flex-1" : "hidden md:flex md:flex-col",
           )}
         >
@@ -683,25 +745,47 @@ export default function InboxPage() {
             onRefresh={handleManualRefresh}
             onToggleAI={handleToggleAIMode}
             onDelete={handleDeleteConversation}
+            onOpenContactPanel={handleOpenContactPanel}
           />
-        </div>
 
-        {/* ── RIGHT: Contact / CRM Sidebar — desktop only (BUG 3) ── */}
-        <div
-          className="hidden lg:flex lg:flex-col h-full overflow-hidden"
-          style={{
-            background: "#202C33",
-            borderLeft: "1px solid #2A3942",
-            minWidth: "340px",
-            maxWidth: "400px",
-          }}
-        >
-          <ContactSidebar
-            contact={activeContact}
-            conversation={activeConversation}
-            onRefresh={handleManualRefresh}
-            profiles={profiles}
-          />
+          {/*
+            ── RIGHT: Contact Details Overlay Panel ──
+            Hidden by default. Slides in from the right when the user
+            clicks the avatar or customer name in the chat header.
+            On desktop: overlays the right portion of the chat.
+            On mobile:  full-width slide-in drawer with dark backdrop.
+          */}
+
+          {/* Mobile backdrop */}
+          {showContactPanel && (
+            <div
+              className="absolute inset-0 z-20 md:hidden"
+              style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(2px)" }}
+              onClick={handleCloseContactPanel}
+              aria-hidden="true"
+            />
+          )}
+
+          {/* Sliding panel */}
+          <div
+            className={cn(
+              "absolute top-0 right-0 h-full z-30 flex flex-col",
+              "transition-transform duration-300 ease-in-out",
+              "w-full md:w-[350px]",
+              showContactPanel ? "translate-x-0" : "translate-x-full",
+            )}
+            style={{
+              boxShadow: showContactPanel ? "-4px 0 24px rgba(0,0,0,0.4)" : "none",
+            }}
+          >
+            <ContactSidebar
+              contact={activeContact}
+              conversation={activeConversation}
+              onRefresh={handleManualRefresh}
+              profiles={profiles}
+              onClose={handleCloseContactPanel}
+            />
+          </div>
         </div>
       </div>
     </div>

@@ -30,6 +30,7 @@ import {
   ArrowDown,
   Zap,
   Users,
+  UserRound,
 } from "lucide-react";
 import { format, isToday, isYesterday, differenceInHours } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -104,6 +105,11 @@ interface MessageThreadProps {
    * Fired when the conversation is soft-deleted.
    */
   onDelete?: (conversationId: string) => void;
+  /**
+   * Opens the right-hand contact details panel. Called when the user
+   * clicks the avatar or customer name in the chat header.
+   */
+  onOpenContactPanel?: () => void;
 }
 
 function formatDateSeparator(dateStr: string): string {
@@ -159,6 +165,7 @@ export function MessageThread({
   onRefresh,
   onToggleAI,
   onDelete,
+  onOpenContactPanel,
 }: MessageThreadProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -422,7 +429,7 @@ export function MessageThread({
       .reverse()
       .find((m) => m.sender_type === "customer");
 
-    if (!lastCustomerMsg) return { expired: true, remaining: "No customer messages" };
+    if (!lastCustomerMsg) return { expired: false, remaining: "" };
 
     const hoursSince = differenceInHours(new Date(), new Date(lastCustomerMsg.created_at));
     const expired = hoursSince >= 24;
@@ -1056,7 +1063,13 @@ export function MessageThread({
               <ArrowLeft className="h-5 w-5" />
             </button>
           )}
-          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-slate-700 text-sm font-medium text-white relative">
+          {/* Clickable avatar — opens contact details panel */}
+          <button
+            type="button"
+            onClick={onOpenContactPanel}
+            aria-label="View contact details"
+            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-slate-700 text-sm font-medium text-white relative cursor-pointer transition-all hover:ring-2 hover:ring-primary/60 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/60"
+          >
             {contact.avatar_url ? (
               <img
                 src={contact.avatar_url}
@@ -1067,11 +1080,19 @@ export function MessageThread({
               displayName.charAt(0).toUpperCase()
             )}
             {/* Green Online presence dot mock */}
-            <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 border border-slate-900" />
-          </div>
+            <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 border border-slate-900 pointer-events-none" />
+          </button>
           <div className="min-w-0">
             <div className="flex items-baseline gap-1.5">
-              <h2 className="truncate text-sm font-semibold text-slate-100">{displayName}</h2>
+              {/* Clickable name — opens contact details panel */}
+              <button
+                type="button"
+                onClick={onOpenContactPanel}
+                className="truncate text-sm font-semibold text-slate-100 hover:text-white hover:underline underline-offset-2 transition-colors cursor-pointer bg-transparent border-0 p-0 text-left"
+                aria-label="View contact details"
+              >
+                {displayName}
+              </button>
               {contact.company && (
                 <span className="truncate text-[11px] text-slate-400">({contact.company})</span>
               )}
@@ -1094,6 +1115,17 @@ export function MessageThread({
         </div>
 
         <div className="flex items-center gap-1.5">
+          {/* Contact Info — opens the contact details panel */}
+          <button
+            type="button"
+            onClick={onOpenContactPanel}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
+            title="Contact Details"
+            aria-label="Open contact details"
+          >
+            <UserRound className="h-4 w-4" />
+          </button>
+
           {/* Quick Call */}
           <a
             href={`tel:${contact.phone}`}
@@ -1104,15 +1136,17 @@ export function MessageThread({
           </a>
 
           {/* Quick WhatsApp */}
-          <a
-            href={`https://wa.me/${contact.phone.replace(/[^0-9]/g, '')}`}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            type="button"
+            onClick={() => {
+              const el = document.getElementById("message-textarea");
+              if (el) el.focus();
+            }}
             className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
-            title="Chat directly on WhatsApp"
+            title="Focus message composer"
           >
             <Share2 className="h-4 w-4" />
-          </a>
+          </button>
 
           {/* Quick Star/Favorite */}
           <button

@@ -18,7 +18,7 @@ import type {
   AutomationLogStepResult,
 } from "@/types"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import { cn, isValidUUID } from "@/lib/utils"
 import { formatRelative } from "@/lib/automations/trigger-meta"
 
 export default function AutomationLogsPage({
@@ -32,10 +32,17 @@ export default function AutomationLogsPage({
   const [automation, setAutomation] = useState<Automation | null>(null)
   const [logs, setLogs] = useState<AutomationLog[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
   const [openLogId, setOpenLogId] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!isValidUUID(id)) {
+      setError("Invalid automation identifier format.")
+      setLoading(false)
+      return
+    }
     async function load() {
+      setLoading(true)
       try {
         const supabase = createClient()
         const [autRes, logRes] = await Promise.all([
@@ -57,26 +64,31 @@ export default function AutomationLogsPage({
         setLogs((logRes.data ?? []) as AutomationLog[])
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load logs")
+      } finally {
+        setLoading(false)
       }
     }
     load()
   }, [id])
 
-  if (error) {
+  if (loading) {
     return (
-      <div className="flex h-64 flex-col items-center justify-center gap-3">
-        <p className="text-sm text-red-400">{error}</p>
-        <Button variant="outline" onClick={() => router.push("/automations")}>
-          Back
-        </Button>
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
       </div>
     )
   }
 
-  if (!automation || logs === null) {
+  if (error || !automation || logs === null) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      <div className="flex min-h-[50vh] flex-col items-center justify-center text-center p-6 bg-slate-900 border border-slate-800 rounded-xl my-8 max-w-2xl mx-auto w-full select-none">
+        <h2 className="text-xl font-semibold text-white mb-2">Automation Not Found</h2>
+        <p className="text-sm text-slate-400 mb-6 max-w-md">
+          {error ?? "The requested automation was not found or has been deleted."}
+        </p>
+        <Button variant="outline" onClick={() => router.push("/automations")}>
+          Back to Automations
+        </Button>
       </div>
     )
   }

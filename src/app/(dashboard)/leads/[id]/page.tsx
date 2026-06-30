@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import type { Quotation } from '@/types'
+import { isValidUUID } from '@/lib/utils'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -146,6 +147,11 @@ export default function LeadDetailPage() {
   // ─── Data Loading ───────────────────────────────────────────────────────────
 
   const fetchLead = useCallback(async () => {
+    if (!isValidUUID(leadId)) {
+      setLoading(false)
+      setLead(null)
+      return
+    }
     setLoading(true)
     try {
       const { data, error } = await supabase
@@ -296,7 +302,23 @@ export default function LeadDetailPage() {
     )
   }
 
-  if (!lead) return null
+  if (!lead) {
+    return (
+      <div className="flex min-h-[50vh] flex-col items-center justify-center text-center p-6 bg-slate-900 border border-slate-800 rounded-xl my-8 max-w-2xl mx-auto w-full select-none">
+        <h2 className="text-xl font-semibold text-white mb-2">No Lead Found</h2>
+        <p className="text-sm text-slate-400 mb-6 max-w-md">
+          The requested lead could not be loaded. It may have been deleted, or the URL may be invalid.
+        </p>
+        <Link
+          href="/leads"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Leads List
+        </Link>
+      </div>
+    );
+  }
 
   const statusCfg = STATUS_CONFIG[lead.status]
   const StatusIcon = statusCfg.icon

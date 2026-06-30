@@ -71,19 +71,32 @@ export async function executeHandoff(
 
     // 3. Build lead summary from conversation memory
     const convMemory = await getConversationMemory(input.conversationId)
-    const summaryParts: string[] = []
+    const facts = convMemory?.extracted_facts || {}
+    
+    const detectedLanguage = convMemory?.preferred_language || facts.detected_language || 'English'
+    const intent = facts.intent || facts.customer_interest || 'Inquiry'
+    const conversationSummary = convMemory?.summary || 'No summary available.'
+    const aiActions = facts.ai_actions || 'Answered customer queries.'
+    const suggestedNextReply = facts.suggested_next_reply || 'Please follow up to confirm details.'
 
-    if (input.contactName) summaryParts.push(`Buyer: ${input.contactName}`)
-    if (convMemory?.customer_interest) summaryParts.push(`Interest: ${convMemory.customer_interest}`)
-    if (convMemory?.product) summaryParts.push(`Product: ${convMemory.product}`)
-    if (convMemory?.budget) summaryParts.push(`Budget: ${convMemory.budget}`)
-    if (convMemory?.quantity) summaryParts.push(`Quantity: ${convMemory.quantity}`)
-    if (convMemory?.urgency) summaryParts.push(`Urgency: ${convMemory.urgency}`)
-    if (convMemory?.location) summaryParts.push(`Location: ${convMemory.location}`)
-    if (convMemory?.need_date) summaryParts.push(`Need Date: ${convMemory.need_date}`)
-    if (convMemory?.summary) summaryParts.push(`Summary: ${convMemory.summary}`)
-    summaryParts.push(`Handoff Reason: ${input.reason}`)
-    summaryParts.push(`Messages: ${convMemory?.message_count ?? 0}`)
+    const summaryParts: string[] = []
+    summaryParts.push(`**Detected Language**: ${detectedLanguage}`)
+    summaryParts.push(`**Customer Intent**: ${intent}`)
+    summaryParts.push(`**Conversation Summary**: ${conversationSummary}`)
+    summaryParts.push(`**AI Actions**: ${aiActions}`)
+    summaryParts.push(`**Suggested Next Reply**: ${suggestedNextReply}`)
+    summaryParts.push('')
+    summaryParts.push(`---`)
+    summaryParts.push(`**Lead Details**:`)
+    if (input.contactName) summaryParts.push(`- Buyer: ${input.contactName}`)
+    if (convMemory?.product) summaryParts.push(`- Product: ${convMemory.product}`)
+    if (convMemory?.budget) summaryParts.push(`- Budget: ${convMemory.budget}`)
+    if (convMemory?.quantity) summaryParts.push(`- Quantity: ${convMemory.quantity}`)
+    if (convMemory?.urgency) summaryParts.push(`- Urgency: ${convMemory.urgency}`)
+    if (convMemory?.location) summaryParts.push(`- Location: ${convMemory.location}`)
+    if (convMemory?.need_date) summaryParts.push(`- Need Date: ${convMemory.need_date}`)
+    summaryParts.push(`- Handoff Reason: ${input.reason}`)
+    summaryParts.push(`- Messages Exchanged: ${convMemory?.message_count ?? 0}`)
 
     const aiSummary = summaryParts.join('\n')
 

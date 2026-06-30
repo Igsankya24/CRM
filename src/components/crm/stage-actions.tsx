@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   CrmLead,
   CrmStage,
@@ -38,6 +39,7 @@ interface StageActionsProps {
 
 /** Context-aware action panel — shows relevant actions based on the current stage. */
 export function StageActions({ lead, onTransition, onLogActivity, onUpdate }: StageActionsProps) {
+  const router = useRouter();
   const [transitioning, setTransitioning] = useState<string | null>(null);
 
   const nextStages = CRM_STAGE_TRANSITIONS[lead.stage as CrmStage] || [];
@@ -99,7 +101,7 @@ export function StageActions({ lead, onTransition, onLogActivity, onUpdate }: St
             color="text-green-400"
             onClick={() => {
               if (lead.phone) {
-                window.open(`https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}`, '_blank');
+                router.push(`/inbox?phone=${encodeURIComponent(lead.phone)}&name=${encodeURIComponent(lead.buyer_name || '')}&docType=enquiry&docId=${lead.id}`);
               }
               onLogActivity('WHATSAPP_CHAT', 'WhatsApp message sent');
             }}

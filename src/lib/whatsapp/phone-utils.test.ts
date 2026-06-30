@@ -6,6 +6,7 @@ import {
   phoneVariants,
   phonesMatch,
   sanitizePhoneForMeta,
+  normalizePhoneForCRM,
 } from "./phone-utils";
 
 describe("sanitizePhoneForMeta", () => {
@@ -33,6 +34,24 @@ describe("normalizePhone", () => {
     for (const s of samples) {
       expect(normalizePhone(s)).toBe(sanitizePhoneForMeta(s));
     }
+  });
+});
+
+describe("normalizePhoneForCRM", () => {
+  it("normalizes 10-digit Indian numbers with +91 prefix", () => {
+    expect(normalizePhoneForCRM("8792653748")).toBe("+918792653748");
+    expect(normalizePhoneForCRM(" 879-265-3748 ")).toBe("+918792653748");
+  });
+
+  it("normalizes international formats by keeping + or adding + if missing", () => {
+    expect(normalizePhoneForCRM("+918792653748")).toBe("+918792653748");
+    expect(normalizePhoneForCRM("918792653748")).toBe("+918792653748");
+    expect(normalizePhoneForCRM("+14155551212")).toBe("+14155551212");
+    expect(normalizePhoneForCRM("14155551212")).toBe("+14155551212");
+  });
+
+  it("returns empty string for empty input", () => {
+    expect(normalizePhoneForCRM("")).toBe("");
   });
 });
 

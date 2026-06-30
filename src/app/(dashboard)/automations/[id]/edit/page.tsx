@@ -11,6 +11,7 @@ import {
   type ServerStepNode,
 } from "@/components/automations/automation-builder"
 import type { AutomationTriggerType } from "@/types"
+import { isValidUUID } from "@/lib/utils"
 
 export default function EditAutomationPage({
   params,
@@ -23,6 +24,10 @@ export default function EditAutomationPage({
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!isValidUUID(id)) {
+      setError("Invalid automation identifier (must be a valid UUID)")
+      return
+    }
     let cancelled = false
     async function load() {
       const res = await fetch(`/api/automations/${id}`)
@@ -50,11 +55,14 @@ export default function EditAutomationPage({
 
   if (error) {
     return (
-      <div className="flex h-screen flex-col items-center justify-center gap-3">
-        <p className="text-sm text-red-400">{error}</p>
+      <div className="flex min-h-[50vh] flex-col items-center justify-center text-center p-6 bg-slate-900 border border-slate-800 rounded-xl my-8 max-w-2xl mx-auto w-full select-none">
+        <h2 className="text-xl font-semibold text-white mb-2">Automation Error</h2>
+        <p className="text-sm text-slate-400 mb-6 max-w-md">
+          {error}
+        </p>
         <button
           onClick={() => router.push("/automations")}
-          className="text-sm text-primary hover:text-primary/80"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 transition-colors"
         >
           Back to Automations
         </button>

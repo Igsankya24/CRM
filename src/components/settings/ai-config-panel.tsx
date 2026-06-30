@@ -36,7 +36,7 @@ export function AIConfigPanel() {
   const [saving, setSaving] = useState(false);
   const [configId, setConfigId] = useState<string | null>(null);
   
-  const [aiEnabled, setAiEnabled] = useState(false);
+  const [aiEnabled, setAiEnabled] = useState(true);
   const [onlyFreeModels, setOnlyFreeModels] = useState(true);
   const [aiModel, setAiModel] = useState('meta-llama/llama-3.3-70b-instruct:free');
   const [aiSystemPrompt, setAiSystemPrompt] = useState('');
@@ -75,7 +75,7 @@ export function AIConfigPanel() {
 
       if (data.config) {
         setConfigId(data.config.id);
-        setAiEnabled(data.config.ai_enabled ?? false);
+        setAiEnabled(data.config.ai_enabled ?? true);
         setOnlyFreeModels(data.config.ai_only_free_models ?? true);
         setAiModel(data.config.ai_model ?? 'google/gemini-2.5-flash:free');
         setAiSystemPrompt(data.config.ai_system_prompt ?? '');

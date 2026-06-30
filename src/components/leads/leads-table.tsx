@@ -461,12 +461,10 @@ export function LeadsTable({
                           render={
                             <button
                               type="button"
-                              onClick={() =>
-                                window.open(
-                                  `https://wa.me/${lead.mobile?.replace(/\D/g, '') || ''}`,
-                                  '_blank'
-                                )
-                              }
+                              onClick={() => {
+                                const phone = lead.mobile || '';
+                                router.push(`/inbox?phone=${encodeURIComponent(phone)}&name=${encodeURIComponent(lead.buyer_name || '')}&docType=enquiry&docId=${lead.id}`);
+                              }}
                               className="h-7 w-7 flex items-center justify-center rounded-md text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
                             />
                           }

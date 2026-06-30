@@ -7,6 +7,7 @@ import { ArrowLeft, Pencil, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { ProformaForm } from "@/components/proformas/proforma-form";
 import type { Proforma } from "@/types";
+import { isValidUUID } from "@/lib/utils";
 
 export default function EditProformaPage() {
   const { id } = useParams<{ id: string }>();
@@ -16,6 +17,11 @@ export default function EditProformaPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!isValidUUID(id)) {
+      setLoading(false);
+      setProforma(null);
+      return;
+    }
     fetch(`/api/proformas/${id}`)
       .then((r) => r.json())
       .then((d) => setProforma(d.proforma))
@@ -34,7 +40,23 @@ export default function EditProformaPage() {
     );
   }
 
-  if (!proforma) return null;
+  if (!proforma) {
+    return (
+      <div className="flex min-h-[50vh] flex-col items-center justify-center text-center p-6 bg-slate-900 border border-slate-800 rounded-xl my-8 max-w-2xl mx-auto w-full select-none">
+        <h2 className="text-xl font-semibold text-white mb-2">No Proforma Found</h2>
+        <p className="text-sm text-slate-400 mb-6 max-w-md">
+          The requested proforma could not be loaded. It may have been deleted, or the URL may be invalid.
+        </p>
+        <Link
+          href="/proformas"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Proforma Register
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-5 p-6">

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { toast } from 'sonner'
@@ -62,6 +63,7 @@ function formatInquiryDate(dateStr: string | null | undefined): { dateFormatted:
 }
 
 export function RealtimeLeadFeed({ activePlatform = 'all' }: { activePlatform?: string }) {
+  const router = useRouter()
   const supabase = createClient()
   const { accountId } = useAuth()
 
@@ -405,7 +407,7 @@ export function RealtimeLeadFeed({ activePlatform = 'all' }: { activePlatform?: 
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => window.open(`https://wa.me/${lead.mobile?.replace(/\D/g, '') || ''}`, '_blank')}
+                              onClick={() => router.push(`/inbox?phone=${encodeURIComponent(lead.mobile || '')}&name=${encodeURIComponent(lead.buyer_name || '')}&docType=enquiry&docId=${lead.id}`)}
                               className="h-7 w-7 p-0 hover:bg-emerald-500/10 text-emerald-500"
                               title="Chat on WhatsApp"
                             >

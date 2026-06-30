@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "@/lib/auth/permissions";
 import { adminDb } from "@/lib/supabase/admin";
 import { toErrorResponse } from "@/lib/auth/account";
+import { createClient } from "@/lib/supabase/server";
 
 export async function GET() {
   try {
@@ -68,5 +69,38 @@ export async function GET() {
     });
   } catch (err) {
     return toErrorResponse(err);
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const supabase = await createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user;
+
+    const body = await request.json();
+    const { route, module = 'error', action = 'crash', errorMsg, stack, api, dbQuery } = body;
+
+    const { error: logErr } = await adminDb
+      .from('audit_logs')
+      .insert({
+        user_id: user?.id || null,
+        module,
+        action,
+        new_value: {
+          route,
+          errorMsg,
+          stack,
+          api,
+          dbQuery,
+          time: new Date().toISOString()
+        }
+      });
+
+    if (logErr) throw logErr;
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error('Error logging endpoint failed:', err);
+    return NextResponse.json({ error: 'Failed to write log' }, { status: 500 });
   }
 }

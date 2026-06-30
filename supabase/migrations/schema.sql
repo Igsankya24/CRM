@@ -159,7 +159,7 @@ CREATE TABLE IF NOT EXISTS conversations (
   unread_count INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  ai_mode BOOLEAN NOT NULL DEFAULT false,
+  ai_mode BOOLEAN NOT NULL DEFAULT true,
   ai_model TEXT,
   ai_system_prompt TEXT
 );
@@ -213,7 +213,7 @@ CREATE TABLE IF NOT EXISTS whatsapp_config (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id),
-  ai_enabled BOOLEAN NOT NULL DEFAULT false,
+  ai_enabled BOOLEAN NOT NULL DEFAULT true,
   ai_only_free_models BOOLEAN NOT NULL DEFAULT true,
   ai_model TEXT NOT NULL DEFAULT 'google/gemini-2.5-flash:free',
   ai_system_prompt TEXT,
@@ -226,7 +226,7 @@ DROP POLICY IF EXISTS "Users can manage own config" ON whatsapp_config;
 CREATE POLICY "Users can manage own config" ON whatsapp_config FOR ALL USING (auth.uid() = user_id);
 
 -- Add AI configuration columns if not exists (for existing database environments)
-ALTER TABLE whatsapp_config ADD COLUMN IF NOT EXISTS ai_enabled BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE whatsapp_config ADD COLUMN IF NOT EXISTS ai_enabled BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE whatsapp_config ADD COLUMN IF NOT EXISTS ai_only_free_models BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE whatsapp_config ADD COLUMN IF NOT EXISTS ai_model TEXT NOT NULL DEFAULT 'google/gemini-2.5-flash:free';
 ALTER TABLE whatsapp_config ADD COLUMN IF NOT EXISTS ai_system_prompt TEXT;
@@ -3586,7 +3586,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_account_phone_normalized
 -- ai_mode = true  → AI agent automatically replies to inbound messages
 -- ai_mode = false → Human agent handles replies (default)
 ALTER TABLE conversations
-  ADD COLUMN IF NOT EXISTS ai_mode BOOLEAN NOT NULL DEFAULT false;
+  ADD COLUMN IF NOT EXISTS ai_mode BOOLEAN NOT NULL DEFAULT true;
 
 -- Optional: store which AI model/provider handles this conversation
 -- Allows per-conversation model overrides (e.g. GPT-4 for VIP customers)
@@ -3600,7 +3600,7 @@ ALTER TABLE conversations
 
 -- Add AI configuration columns to whatsapp_config (if not already present)
 ALTER TABLE whatsapp_config 
-  ADD COLUMN IF NOT EXISTS ai_enabled BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS ai_enabled BOOLEAN NOT NULL DEFAULT true,
   ADD COLUMN IF NOT EXISTS ai_only_free_models BOOLEAN NOT NULL DEFAULT true,
   ADD COLUMN IF NOT EXISTS ai_model TEXT NOT NULL DEFAULT 'google/gemini-2.5-flash:free',
   ADD COLUMN IF NOT EXISTS ai_system_prompt TEXT,
@@ -6724,6 +6724,9 @@ CREATE TABLE IF NOT EXISTS public.company_bank_accounts (
   account_number      TEXT NOT NULL,
   bank_name           TEXT NOT NULL,
   bank_ifsc           TEXT NOT NULL,
+  branch_name         TEXT,
+  swift_code          TEXT,
+  upi_id              TEXT,
   is_default          BOOLEAN DEFAULT false,
   created_at          TIMESTAMPTZ DEFAULT NOW(),
   updated_at          TIMESTAMPTZ DEFAULT NOW()
@@ -6737,9 +6740,9 @@ DROP POLICY IF EXISTS company_bank_accounts_update ON public.company_bank_accoun
 DROP POLICY IF EXISTS company_bank_accounts_delete ON public.company_bank_accounts;
 
 CREATE POLICY company_bank_accounts_select ON public.company_bank_accounts FOR SELECT USING (is_account_member(account_id));
-CREATE POLICY company_bank_accounts_insert ON public.company_bank_accounts FOR INSERT WITH CHECK (is_account_member(account_id, 'admin'));
-CREATE POLICY company_bank_accounts_update ON public.company_bank_accounts FOR UPDATE USING (is_account_member(account_id, 'admin'));
-CREATE POLICY company_bank_accounts_delete ON public.company_bank_accounts FOR DELETE USING (is_account_member(account_id, 'admin'));
+CREATE POLICY company_bank_accounts_insert ON public.company_bank_accounts FOR INSERT WITH CHECK (is_super_admin() AND is_account_member(account_id));
+CREATE POLICY company_bank_accounts_update ON public.company_bank_accounts FOR UPDATE USING (is_super_admin() AND is_account_member(account_id));
+CREATE POLICY company_bank_accounts_delete ON public.company_bank_accounts FOR DELETE USING (is_super_admin() AND is_account_member(account_id));
 
 DROP TRIGGER IF EXISTS set_updated_at ON public.company_bank_accounts;
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON public.company_bank_accounts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -7554,4 +7557,58 @@ ALTER TABLE public.integration_sync_state ADD COLUMN IF NOT EXISTS custom_end_da
 ALTER TABLE public.b2b_raw_logs ADD COLUMN IF NOT EXISTS response_json JSONB;
 ALTER TABLE public.b2b_raw_logs ADD COLUMN IF NOT EXISTS status TEXT;
 ALTER TABLE public.b2b_raw_logs ADD COLUMN IF NOT EXISTS received_at TIMESTAMPTZ DEFAULT NOW();
+
+-- Add missing columns to company_bank_accounts
+ALTER TABLE public.company_bank_accounts ADD COLUMN IF NOT EXISTS branch_name TEXT;
+ALTER TABLE public.company_bank_accounts ADD COLUMN IF NOT EXISTS swift_code TEXT;
+ALTER TABLE public.company_bank_accounts ADD COLUMN IF NOT EXISTS upi_id TEXT;
+
+-- ============================================================
+-- CLEAN UP LEGACY/BUGGY TRIGGERS
+-- ============================================================
+DO $$
+DECLARE
+  v_trg RECORD;
+BEGIN
+  -- Clean proformas triggers (except updated_at)
+  FOR v_trg IN 
+    SELECT tgname 
+    FROM pg_trigger 
+    WHERE tgrelid = 'public.proformas'::regclass 
+      AND tgname != 'trg_proformas_updated_at'
+      AND tgisinternal = false
+  LOOP
+    EXECUTE 'DROP TRIGGER ' || quote_ident(v_trg.tgname) || ' ON public.proformas;';
+  END LOOP;
+
+  -- Clean quotations triggers (except updated_at)
+  FOR v_trg IN 
+    SELECT tgname 
+    FROM pg_trigger 
+    WHERE tgrelid = 'public.quotations'::regclass 
+      AND tgname != 'trg_quotations_updated_at'
+      AND tgisinternal = false
+  LOOP
+    EXECUTE 'DROP TRIGGER ' || quote_ident(v_trg.tgname) || ' ON public.quotations;';
+  END LOOP;
+
+  -- Clean sales_registers triggers (except updated_at)
+  FOR v_trg IN 
+    SELECT tgname 
+    FROM pg_trigger 
+    WHERE tgrelid = 'public.sales_registers'::regclass 
+      AND tgname != 'trg_sales_registers_updated_at'
+      AND tgisinternal = false
+  LOOP
+    EXECUTE 'DROP TRIGGER ' || quote_ident(v_trg.tgname) || ' ON public.sales_registers;';
+  END LOOP;
+END $$;
+
+-- Make AI enabled by default for existing environments
+ALTER TABLE public.whatsapp_config ALTER COLUMN ai_enabled SET DEFAULT true;
+ALTER TABLE public.conversations ALTER COLUMN ai_mode SET DEFAULT true;
+
+UPDATE public.whatsapp_config SET ai_enabled = true;
+UPDATE public.conversations SET ai_mode = true;
+
 
