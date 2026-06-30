@@ -7611,4 +7611,54 @@ ALTER TABLE public.conversations ALTER COLUMN ai_mode SET DEFAULT true;
 UPDATE public.whatsapp_config SET ai_enabled = true;
 UPDATE public.conversations SET ai_mode = true;
 
+-- ============================================================
+-- SUPABASE REALTIME PUBLICATION
+-- ============================================================
+-- Enable realtime for the tables the Inbox subscribes to.
+-- Without this, new inbound WhatsApp messages and conversation
+-- updates are saved to the DB but never pushed to connected
+-- browser clients, so the inbox never updates live.
+--
+-- REPLICA IDENTITY FULL is required so that UPDATE and DELETE
+-- events include the full old row (needed for Realtime to diff
+-- and send correct payloads to subscribed clients).
+-- ============================================================
+
+-- Set REPLICA IDENTITY to FULL so UPDATE/DELETE payloads include old row data
+ALTER TABLE public.messages       REPLICA IDENTITY FULL;
+ALTER TABLE public.conversations  REPLICA IDENTITY FULL;
+ALTER TABLE public.contacts       REPLICA IDENTITY FULL;
+
+-- Add tables to supabase_realtime publication if not already added
+DO $$
+DECLARE
+  v_exists boolean;
+BEGIN
+  -- messages
+  SELECT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'messages'
+  ) INTO v_exists;
+  IF NOT v_exists THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+  END IF;
+
+  -- conversations
+  SELECT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'conversations'
+  ) INTO v_exists;
+  IF NOT v_exists THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.conversations;
+  END IF;
+
+  -- contacts (for contact name updates showing live in inbox sidebar)
+  SELECT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'contacts'
+  ) INTO v_exists;
+  IF NOT v_exists THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.contacts;
+  END IF;
+END $$;
 
