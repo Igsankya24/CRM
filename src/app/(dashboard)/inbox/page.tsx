@@ -101,11 +101,16 @@ export default function InboxPage() {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("conversations")
-        .select("*, contact:contacts(*)")
+        .select(`
+          *,
+          contact:contacts(*, blocked:blocked_contacts(id)),
+          settings:conversation_settings(*),
+          lead_conversations(lead:b2b_leads(*))
+        `)
         .eq("id", convId)
         .maybeSingle();
       if (error) {
-        console.error("Failed to hydrate conversation:", {
+        console.error("[Inbox] Failed to hydrate conversation:", {
           message: error.message,
           details: error.details,
           hint: error.hint,
@@ -115,12 +120,22 @@ export default function InboxPage() {
       }
       if (!data) return;
       const fetched = data as Conversation;
+      console.log("[Inbox] Hydrated conversation:", fetched.id, "last_message_text:", fetched.last_message_text);
       setConversations((prev) => {
         const existing = prev.find((c) => c.id === fetched.id);
         if (existing) {
+          // Merge fetched data fully (last_message_text, unread_count, etc.)
+          // but preserve any local overrides already applied (e.g. unread_count=0
+          // if the user has this conversation open)
           return prev.map((c) =>
             c.id === fetched.id
-              ? { ...c, contact: c.contact ?? fetched.contact }
+              ? {
+                  ...fetched,
+                  // Keep contact if already hydrated (avoid flicker)
+                  contact: c.contact ?? fetched.contact,
+                  settings: c.settings ?? fetched.settings,
+                  lead_conversations: c.lead_conversations ?? fetched.lead_conversations,
+                }
               : c,
           );
         }
@@ -389,6 +404,7 @@ export default function InboxPage() {
   const handleMessageEvent = useCallback(
     (event: { eventType: string; new: Message; old: Partial<Message> }) => {
       const newMsg = event.new;
+      console.log("[Inbox] handleMessageEvent:", event.eventType, "conv:", newMsg.conversation_id, "text:", newMsg.content_text);
 
       if (event.eventType === "INSERT") {
         if (
@@ -405,8 +421,8 @@ export default function InboxPage() {
         }
 
         if (knownConvIdsRef.current.has(newMsg.conversation_id)) {
-          setConversations((prev) =>
-            prev.map((c) =>
+          setConversations((prev) => {
+            const updated = prev.map((c) =>
               c.id === newMsg.conversation_id
                 ? {
                     ...c,
@@ -418,8 +434,15 @@ export default function InboxPage() {
                         : c.unread_count + 1,
                   }
                 : c,
-            ),
-          );
+            );
+            // Bubble updated conversation to top
+            const idx = updated.findIndex((c) => c.id === newMsg.conversation_id);
+            if (idx > 0) {
+              const [moved] = updated.splice(idx, 1);
+              return [moved, ...updated];
+            }
+            return updated;
+          });
         } else {
           hydrateConversation(newMsg.conversation_id);
         }
@@ -442,13 +465,11 @@ export default function InboxPage() {
       old: Partial<Conversation>;
     }) => {
       const conv = event.new;
+      console.log("[Inbox] handleConversationEvent:", event.eventType, conv.id, "last_message_text:", conv.last_message_text);
 
       if (event.eventType === "INSERT") {
         if (!knownConvIdsRef.current.has(conv.id)) {
-          setConversations((prev) => {
-            if (prev.some((c) => c.id === conv.id)) return prev;
-            return [conv, ...prev];
-          });
+          // Always hydrate so we get contact + settings + lead_conversations
           hydrateConversation(conv.id);
         }
       }
@@ -468,9 +489,16 @@ export default function InboxPage() {
               prev.map((c) =>
                 c.id === conv.id
                   ? {
+                      // Preserve joined fields that realtime payload won't include
                       ...c,
-                      ...conv,
-                      unread_count: isActive ? 0 : conv.unread_count,
+                      // Spread only the scalar columns from the realtime payload
+                      last_message_text: conv.last_message_text ?? c.last_message_text,
+                      last_message_at: conv.last_message_at ?? c.last_message_at,
+                      unread_count: isActive ? 0 : (conv.unread_count ?? c.unread_count),
+                      status: conv.status ?? c.status,
+                      ai_mode: conv.ai_mode ?? c.ai_mode,
+                      assigned_agent_id: conv.assigned_agent_id ?? c.assigned_agent_id,
+                      updated_at: conv.updated_at ?? c.updated_at,
                     }
                   : c,
               ),
@@ -481,7 +509,14 @@ export default function InboxPage() {
 
         if (activeConversation && conv.id === activeConversation.id) {
           setActiveConversation((prev) =>
-            prev ? { ...prev, ...conv } : prev
+            prev ? {
+              ...prev,
+              last_message_text: conv.last_message_text ?? prev.last_message_text,
+              last_message_at: conv.last_message_at ?? prev.last_message_at,
+              status: conv.status ?? prev.status,
+              ai_mode: conv.ai_mode ?? prev.ai_mode,
+              assigned_agent_id: conv.assigned_agent_id ?? prev.assigned_agent_id,
+            } : prev
           );
         }
       }
