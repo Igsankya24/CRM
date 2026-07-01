@@ -63,7 +63,7 @@ export async function GET() {
 
     const { data: config, error: configError } = await supabase
       .from('whatsapp_config')
-      .select('id, app_secret, openrouter_api_key')
+      .select('id, app_secret, openrouter_api_key, gemini_api_key')
       .eq('account_id', accountId)
       .maybeSingle()
 
@@ -82,11 +82,15 @@ export async function GET() {
     const hasOpenRouterKey = Boolean(config.openrouter_api_key)
     const maskedOpenRouterKey = hasOpenRouterKey ? '••••••••••••••••' : ''
 
+    const hasGeminiKey = Boolean(config.gemini_api_key)
+    const maskedGeminiKey = hasGeminiKey ? '••••••••••••••••' : ''
+
     return NextResponse.json({
       config: {
         id: config.id,
         app_secret: maskedAppSecret,
         openrouter_api_key: maskedOpenRouterKey,
+        gemini_api_key: maskedGeminiKey,
       },
     })
   } catch (error) {
@@ -141,7 +145,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { app_secret, openrouter_api_key } = body
+    const { app_secret, openrouter_api_key, gemini_api_key } = body
 
     const { data: existing, error: fetchError } = await supabase
       .from('whatsapp_config')
@@ -179,6 +183,23 @@ export async function POST(request: NextRequest) {
       } catch (err) {
         console.error('[api/settings/credentials POST] OpenRouter API key encryption error:', err)
         return NextResponse.json({ error: 'Failed to securely encrypt OpenRouter API key' }, { status: 500 })
+      }
+    }
+
+    // Process gemini_api_key
+    if (gemini_api_key !== undefined) {
+      if (!isSuperAdmin) {
+        return NextResponse.json({ error: 'Forbidden: Only Super Admin can modify the Gemini API Key' }, { status: 403 })
+      }
+      if (gemini_api_key === '') {
+        updateData.gemini_api_key = null
+      } else if (gemini_api_key && gemini_api_key !== '••••••••••••••••') {
+        try {
+          updateData.gemini_api_key = encrypt(gemini_api_key.trim())
+        } catch (err) {
+          console.error('[api/settings/credentials POST] Gemini API key encryption error:', err)
+          return NextResponse.json({ error: 'Failed to securely encrypt Gemini API key' }, { status: 500 })
+        }
       }
     }
 

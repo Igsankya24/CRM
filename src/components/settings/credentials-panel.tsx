@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { toast } from 'sonner';
-import { Loader2, Key, Save, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { Loader2, Key, Save, Eye, EyeOff, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
+import { usePermissions } from '@/hooks/use-permissions';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -14,6 +15,7 @@ const MASKED_TOKEN = '••••••••••••••••';
 
 export function CredentialsPanel() {
   const { user, accountId, loading: authLoading, profileLoading } = useAuth();
+  const { isSuperAdmin, loading: permissionLoading } = usePermissions();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -26,6 +28,18 @@ export function CredentialsPanel() {
   const [openrouterApiKey, setOpenrouterApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
   const [apiKeyEdited, setApiKeyEdited] = useState(false);
+
+  const [geminiApiKey, setGeminiApiKey] = useState('');
+  const [showGeminiKey, setShowGeminiKey] = useState(false);
+  const [geminiKeyEdited, setGeminiKeyEdited] = useState(false);
+
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [testResult, setTestResult] = useState<{
+    success: boolean;
+    latency?: number;
+    errorType?: string;
+    errorMessage?: string;
+  } | null>(null);
 
   const fetchCredentials = useCallback(async () => {
     setLoading(true);
@@ -40,8 +54,10 @@ export function CredentialsPanel() {
         setConfigId(data.config.id);
         setAppSecret(data.config.app_secret || '');
         setOpenrouterApiKey(data.config.openrouter_api_key || '');
+        setGeminiApiKey(data.config.gemini_api_key || '');
         setAppSecretEdited(false);
         setApiKeyEdited(false);
+        setGeminiKeyEdited(false);
       } else {
         setConfigId(null);
       }
@@ -81,6 +97,9 @@ export function CredentialsPanel() {
       if (apiKeyEdited) {
         payload.openrouter_api_key = openrouterApiKey.trim();
       }
+      if (geminiKeyEdited) {
+        payload.gemini_api_key = geminiApiKey.trim();
+      }
 
       if (Object.keys(payload).length === 0) {
         toast.info('No changes to save');
@@ -109,15 +128,58 @@ export function CredentialsPanel() {
     }
   }
 
-  if (loading) {
+  async function testGeminiConnection() {
+    try {
+      setTestingConnection(true);
+      setTestResult(null);
+
+      const keyToTest = geminiApiKey.trim();
+      if (!keyToTest) {
+        toast.error('Please enter a Gemini API Key to test');
+        return;
+      }
+
+      const res = await fetch('/api/settings/credentials/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: keyToTest }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Server error testing connection');
+      }
+
+      const data = await res.json();
+      if (data.connected) {
+        setTestResult({ success: true, latency: data.latency });
+        toast.success(`Connected! Latency: ${data.latency}ms`);
+      } else {
+        setTestResult({
+          success: false,
+          errorType: data.errorType,
+          errorMessage: data.errorMessage,
+        });
+        toast.error(`Connection failed: ${data.errorMessage || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('Test connection error:', err);
+      setTestResult({
+        success: false,
+        errorMessage: err instanceof Error ? err.message : String(err),
+      });
+      toast.error('Failed to test connection');
+    } finally {
+      setTestingConnection(false);
+    }
+  }
+
+  if (loading || permissionLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="size-6 animate-spin text-primary" />
       </div>
     );
   }
-
-
 
   return (
     <div className="space-y-6 mt-4 max-w-4xl">
@@ -202,8 +264,88 @@ export function CredentialsPanel() {
             </p>
           </div>
 
+          {/* Google Gemini API Key */}
+          <div className="space-y-2 pt-2 border-t border-slate-800">
+            <div className="flex items-center justify-between">
+              <Label className="text-slate-300 flex items-center gap-1.5">
+                Google Gemini API Key
+                {!isSuperAdmin && <span className="text-xs text-amber-500 font-normal flex items-center gap-1"><AlertTriangle className="size-3" /> View Only</span>}
+              </Label>
+              {isSuperAdmin && (
+                <span className="text-xs text-emerald-400 flex items-center gap-1 font-normal">
+                  <ShieldCheck className="size-3" /> Authorized Editor
+                </span>
+              )}
+            </div>
+            <div className="relative">
+              <Input
+                type={showGeminiKey ? 'text' : 'password'}
+                value={geminiApiKey}
+                onChange={(e) => {
+                  if (!isSuperAdmin) return;
+                  setGeminiApiKey(e.target.value);
+                  setGeminiKeyEdited(true);
+                }}
+                onFocus={() => {
+                  if (!isSuperAdmin) return;
+                  if (geminiApiKey === MASKED_TOKEN) {
+                    setGeminiApiKey('');
+                    setGeminiKeyEdited(true);
+                  }
+                }}
+                disabled={!isSuperAdmin}
+                placeholder={isSuperAdmin ? "Enter Google Gemini API Key" : "Access restricted to Super Admins"}
+                className={`w-full h-10 pl-3 pr-10 rounded-lg border border-slate-700 bg-slate-800 text-sm text-white focus:outline-none focus:border-primary/50 font-sans ${!isSuperAdmin ? 'opacity-60 cursor-not-allowed' : ''}`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowGeminiKey(!showGeminiKey)}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-white"
+              >
+                {showGeminiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </button>
+            </div>
+            <p className="text-xs text-slate-500">
+              Used to query Google Gemini API directly. Allows leveraging native Google models with direct credentials.
+            </p>
+
+            {/* Test Connection Button */}
+            <div className="flex items-center gap-3 pt-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={testGeminiConnection}
+                disabled={testingConnection || !geminiApiKey}
+                className="border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white text-xs h-8"
+              >
+                {testingConnection ? (
+                  <>
+                    <Loader2 className="size-3 animate-spin mr-1.5" />
+                    Testing...
+                  </>
+                ) : (
+                  'Test Connection'
+                )}
+              </Button>
+              {testResult && (
+                <div className="text-xs">
+                  {testResult.success ? (
+                    <span className="text-emerald-400 flex items-center gap-1 font-medium">
+                      ● Connected (Latency: {testResult.latency}ms)
+                    </span>
+                  ) : (
+                    <span className="text-red-400 flex items-center gap-1 font-medium">
+                      ● Failed: {testResult.errorMessage || 'Invalid API Key'}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Save Button */}
-          <div className="pt-2">
+          <div className="pt-4 border-t border-slate-800">
             <Button
               onClick={handleSave}
               disabled={saving}

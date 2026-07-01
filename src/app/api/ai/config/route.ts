@@ -40,7 +40,7 @@ export async function GET() {
 
     const { data: config, error: configError } = await supabase
       .from('whatsapp_config')
-      .select('id, ai_enabled, ai_only_free_models, ai_model, ai_system_prompt, openrouter_api_key')
+      .select('id, ai_enabled, ai_only_free_models, ai_model, ai_system_prompt, openrouter_api_key, ai_fallback_enabled, ai_model_status, ai_last_error, ai_last_success_at, ai_available_models, ai_provider')
       .eq('account_id', accountId)
       .maybeSingle()
 
@@ -61,9 +61,15 @@ export async function GET() {
         id: config.id,
         ai_enabled: config.ai_enabled ?? true,
         ai_only_free_models: config.ai_only_free_models ?? true,
-        ai_model: config.ai_model ?? 'google/gemini-2.5-flash:free',
+        ai_model: config.ai_model ?? 'gemini-2.5-flash',
         ai_system_prompt: config.ai_system_prompt ?? '',
         openrouter_api_key: maskedKey,
+        ai_fallback_enabled: config.ai_fallback_enabled ?? true,
+        ai_model_status: config.ai_model_status ?? 'healthy',
+        ai_last_error: config.ai_last_error ?? null,
+        ai_last_success_at: config.ai_last_success_at ?? null,
+        ai_available_models: config.ai_available_models ?? [],
+        ai_provider: config.ai_provider ?? 'gemini',
       },
     })
   } catch (error) {
@@ -95,11 +101,19 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { ai_enabled, ai_only_free_models, ai_model, ai_system_prompt, openrouter_api_key } = body
+    const { ai_enabled, ai_only_free_models, ai_model, ai_system_prompt, openrouter_api_key, ai_fallback_enabled, ai_provider } = body
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    const isSuperAdmin = profile?.role === 'Super Admin'
 
     const { data: existing, error: fetchError } = await supabase
       .from('whatsapp_config')
-      .select('id')
+      .select('id, ai_provider, ai_model')
       .eq('account_id', accountId)
       .maybeSingle()
 
@@ -115,11 +129,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Permission enforcement: ONLY Super Admin can change AI provider or preferred model
+    const isProviderChanged = ai_provider !== undefined && ai_provider !== (existing.ai_provider ?? 'gemini');
+    const isModelChanged = ai_model !== undefined && ai_model !== existing.ai_model;
+
+    if ((isProviderChanged || isModelChanged) && !isSuperAdmin) {
+      return NextResponse.json({ error: 'Forbidden: Only Super Admins can change the AI Provider or Preferred Model.' }, { status: 403 })
+    }
+
     const updateData: Partial<Database["public"]["Tables"]["whatsapp_config"]["Update"]> = {
       ai_enabled: Boolean(ai_enabled),
       ai_only_free_models: Boolean(ai_only_free_models),
-      ai_model: ai_model || 'google/gemini-2.5-flash:free',
+      ai_model: ai_model || 'gemini-2.5-flash',
       ai_system_prompt: ai_system_prompt?.trim() || null,
+      ai_fallback_enabled: ai_fallback_enabled !== false,
+      ai_provider: ai_provider || 'gemini',
       updated_at: new Date().toISOString(),
     }
 

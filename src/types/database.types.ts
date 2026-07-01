@@ -674,6 +674,13 @@ export interface Database {
           ai_model: string
           ai_system_prompt: string | null
           openrouter_api_key: string | null
+          ai_provider: string | null
+          gemini_api_key: string | null
+          ai_fallback_enabled: boolean
+          ai_model_status: string
+          ai_last_error: string | null
+          ai_last_success_at: string | null
+          ai_available_models: Json
           created_at: string
           updated_at: string
         }
@@ -696,6 +703,13 @@ export interface Database {
           ai_model?: string
           ai_system_prompt?: string | null
           openrouter_api_key?: string | null
+          ai_provider?: string | null
+          gemini_api_key?: string | null
+          ai_fallback_enabled?: boolean
+          ai_model_status?: string
+          ai_last_error?: string | null
+          ai_last_success_at?: string | null
+          ai_available_models?: Json
           created_at?: string
           updated_at?: string
         }
@@ -718,8 +732,56 @@ export interface Database {
           ai_model?: string
           ai_system_prompt?: string | null
           openrouter_api_key?: string | null
+          ai_provider?: string | null
+          gemini_api_key?: string | null
+          ai_fallback_enabled?: boolean
+          ai_model_status?: string
+          ai_last_error?: string | null
+          ai_last_success_at?: string | null
+          ai_available_models?: Json
           created_at?: string
           updated_at?: string
+        }
+      }
+      ai_fallback_logs: {
+        Row: {
+          id: string
+          account_id: string
+          conversation_id: string | null
+          selected_model: string
+          failed_model: string | null
+          fallback_model: string | null
+          reason_for_fallback: string | null
+          http_status: number | null
+          latency_ms: number | null
+          token_usage: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          conversation_id?: string | null
+          selected_model: string
+          failed_model?: string | null
+          fallback_model?: string | null
+          reason_for_fallback?: string | null
+          http_status?: number | null
+          latency_ms?: number | null
+          token_usage?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          conversation_id?: string | null
+          selected_model?: string
+          failed_model?: string | null
+          fallback_model?: string | null
+          reason_for_fallback?: string | null
+          http_status?: number | null
+          latency_ms?: number | null
+          token_usage?: Json | null
+          created_at?: string
         }
       }
       integration_sync_state: {

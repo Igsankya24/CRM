@@ -1,95 +1,98 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { decrypt } from '@/lib/whatsapp/encryption'
+import { getOrFetchModels, getOrFetchGeminiModels } from '@/lib/ai/agent'
 
-interface OpenRouterModel {
-  id: string
-  name: string
-  pricing?: {
-    prompt: string
-    completion: string
+async function resolveConfig(supabase: any, userId: string) {
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('account_id')
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (!profile?.account_id) return null
+
+  const { data: config } = await supabase
+    .from('whatsapp_config')
+    .select('openrouter_api_key, gemini_api_key, ai_available_models, ai_provider')
+    .eq('account_id', profile.account_id)
+    .maybeSingle()
+
+  return {
+    accountId: profile.account_id,
+    openrouterApiKey: config?.openrouter_api_key ? decrypt(config.openrouter_api_key) : undefined,
+    geminiApiKey: config?.gemini_api_key ? decrypt(config.gemini_api_key) : undefined,
+    availableModels: config?.ai_available_models,
+    aiProvider: config?.ai_provider ?? 'gemini',
   }
 }
 
 export async function GET(request: NextRequest) {
-  // Require authentication
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   try {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('account_id')
-      .eq('user_id', user.id)
-      .maybeSingle()
+    const config = await resolveConfig(supabase, user.id)
+    if (!config) {
+      return NextResponse.json({ models: [] })
+    }
 
-    let apiKey = process.env.OPENROUTER_API_KEY
-    if (profile?.account_id) {
-      const { data: config } = await supabase
-        .from('whatsapp_config')
-        .select('openrouter_api_key')
-        .eq('account_id', profile.account_id)
-        .maybeSingle()
+    const { searchParams } = new URL(request.url)
+    const providerParam = searchParams.get('provider')
+    const targetProvider = providerParam || config.aiProvider
 
-      if (config?.openrouter_api_key) {
-        try {
-          apiKey = decrypt(config.openrouter_api_key)
-        } catch (err) {
-          console.error('[api/ai/models] Failed to decrypt OpenRouter API key:', err)
-        }
+    let modelsList = []
+    if (config.availableModels && typeof config.availableModels === 'object') {
+      const cache = config.availableModels as any
+      if (cache.provider === targetProvider && Array.isArray(cache.models)) {
+        modelsList = cache.models
       }
     }
 
-    const headers: Record<string, string> = {}
-    if (apiKey) {
-      headers['Authorization'] = `Bearer ${apiKey}`
+    if (modelsList.length === 0) {
+      if (targetProvider === 'gemini') {
+        modelsList = await getOrFetchGeminiModels(config.accountId, config.geminiApiKey, false)
+      } else {
+        modelsList = await getOrFetchModels(config.accountId, config.openrouterApiKey, false)
+      }
     }
 
-    const response = await fetch('https://openrouter.ai/api/v1/models', {
-      method: 'GET',
-      headers,
-      next: { revalidate: 3600 }, // Cache models list for 1 hour
-    })
+    return NextResponse.json({ models: modelsList })
+  } catch (err: any) {
+    console.error('[api/ai/models GET] Failed:', err)
+    return NextResponse.json({ models: [], error: err.message || String(err) })
+  }
+}
 
-    if (!response.ok) {
-      throw new Error(`OpenRouter API returned status ${response.status}`)
+export async function POST(request: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    const config = await resolveConfig(supabase, user.id)
+    if (!config) {
+      return NextResponse.json({ error: 'WhatsApp config not found' }, { status: 400 })
     }
 
-    const json = await response.json()
-    if (!json || !Array.isArray(json.data)) {
-      throw new Error('Invalid response structure from OpenRouter')
+    const { searchParams } = new URL(request.url)
+    const providerParam = searchParams.get('provider')
+    const targetProvider = providerParam || config.aiProvider
+
+    let modelsList = []
+    if (targetProvider === 'gemini') {
+      modelsList = await getOrFetchGeminiModels(config.accountId, config.geminiApiKey, true)
+    } else {
+      modelsList = await getOrFetchModels(config.accountId, config.openrouterApiKey, true)
     }
-
-    // Filter models ending with :free or having prompt/completion pricing of 0, excluding media models
-    const freeModels = json.data
-      .filter((model: OpenRouterModel) => {
-        if (!model.id) return false;
-        const id = model.id.toLowerCase();
-        
-        const isFreeSuffix = id.endsWith(':free');
-        const isFreePrice = model.pricing && 
-                            Number(model.pricing.prompt) === 0 && 
-                            Number(model.pricing.completion) === 0;
-                            
-        const isMediaModel = id.includes('lyria') || id.includes('audio') || id.includes('image') || id.includes('/free');
-        
-        return (isFreeSuffix || isFreePrice) && !isMediaModel;
-      })
-      .map((model: OpenRouterModel) => ({
-        id: model.id,
-        name: model.name,
-      }))
-
-    return NextResponse.json({ models: freeModels })
-  } catch (err) {
-    console.error('[api/ai/models] Failed to fetch OpenRouter models:', err)
-    // Return empty list so client can fallback gracefully
-    return NextResponse.json({ models: [], error: 'Failed to fetch models dynamically' })
+    return NextResponse.json({ success: true, models: modelsList })
+  } catch (err: any) {
+    console.error('[api/ai/models POST] Failed to refresh:', err)
+    return NextResponse.json({ success: false, error: err.message || String(err) }, { status: 500 })
   }
 }

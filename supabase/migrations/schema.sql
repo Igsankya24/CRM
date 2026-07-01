@@ -7662,3 +7662,48 @@ BEGIN
   END IF;
 END $$;
 
+
+-- ============================================================
+-- MIGRATION: 025_openrouter_failover.sql
+-- ============================================================
+-- Add failover and tracking columns to whatsapp_config
+ALTER TABLE public.whatsapp_config ADD COLUMN IF NOT EXISTS ai_fallback_enabled BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE public.whatsapp_config ADD COLUMN IF NOT EXISTS ai_model_status TEXT NOT NULL DEFAULT 'healthy'; -- 'healthy', 'degraded', 'unavailable'
+ALTER TABLE public.whatsapp_config ADD COLUMN IF NOT EXISTS ai_last_error TEXT;
+ALTER TABLE public.whatsapp_config ADD COLUMN IF NOT EXISTS ai_last_success_at TIMESTAMPTZ;
+ALTER TABLE public.whatsapp_config ADD COLUMN IF NOT EXISTS ai_available_models JSONB DEFAULT '[]'::jsonb;
+
+-- Create AI Fallback Logs table
+CREATE TABLE IF NOT EXISTS public.ai_fallback_logs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  account_id UUID REFERENCES public.accounts(id) ON DELETE CASCADE,
+  conversation_id UUID REFERENCES public.conversations(id) ON DELETE SET NULL,
+  selected_model TEXT NOT NULL,
+  failed_model TEXT,
+  fallback_model TEXT,
+  reason_for_fallback TEXT,
+  http_status INTEGER,
+  latency_ms INTEGER,
+  token_usage JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enable RLS and add policies
+ALTER TABLE public.ai_fallback_logs ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS ai_fallback_logs_select ON public.ai_fallback_logs;
+CREATE POLICY ai_fallback_logs_select ON public.ai_fallback_logs FOR SELECT USING (public.is_account_member(account_id));
+
+DROP POLICY IF EXISTS ai_fallback_logs_insert ON public.ai_fallback_logs;
+CREATE POLICY ai_fallback_logs_insert ON public.ai_fallback_logs FOR INSERT WITH CHECK (public.is_account_member(account_id));
+
+
+-- MIGRATION: 026_gemini_integration.sql
+-- Add ai_provider and gemini_api_key columns to whatsapp_config
+ALTER TABLE public.whatsapp_config ADD COLUMN IF NOT EXISTS ai_provider TEXT DEFAULT 'gemini';
+ALTER TABLE public.whatsapp_config ALTER COLUMN ai_provider SET DEFAULT 'gemini';
+ALTER TABLE public.whatsapp_config ALTER COLUMN ai_model SET DEFAULT 'gemini-2.5-flash';
+UPDATE public.whatsapp_config SET ai_provider = 'gemini' WHERE ai_provider IS NULL OR ai_provider = 'openrouter';
+UPDATE public.whatsapp_config SET ai_model = 'gemini-2.5-flash' WHERE ai_model = 'google/gemini-2.5-flash:free';
+ALTER TABLE public.whatsapp_config ADD COLUMN IF NOT EXISTS gemini_api_key TEXT;
+

@@ -314,6 +314,8 @@ Use this format:
     onlyFree: aiConfig.onlyFree,
     openrouterApiKey: aiConfig.openrouterApiKey,
     maxTokens: 800,
+    conversationId,
+    accountId,
   })
 
   // Parse structured details from response
